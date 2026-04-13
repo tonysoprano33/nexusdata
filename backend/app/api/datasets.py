@@ -1,8 +1,7 @@
 ﻿import os
 import uuid
 import logging
-from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -19,7 +18,6 @@ from app.services.pdf_generator import generate_pdf_report
 from app.services.pptx_generator import generate_pptx_report
 from app.services.chat_service import chat_with_dataset, generate_sample_questions
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -33,22 +31,21 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
 def make_json_serializable(obj):
-    """Recursively convert numpy/pandas types to JSON-serializable Python types."""
+    """Recursivamente convierte tipos numpy/pandas a tipos Python serializables por JSON."""
     if obj is None:
         return None
     if isinstance(obj, dict):
         return {str(k): make_json_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple, np.ndarray)):
         return [make_json_serializable(i) for i in obj]
-    elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+    elif isinstance(obj, np.integer):      # cubre int64, int32, int16, int8, etc.
         return int(obj)
-    elif isinstance(obj, (np.float64, np.float32, np.float16)):
+    elif isinstance(obj, np.floating):     # cubre float64, float32, float16, etc.
         if np.isnan(obj) or np.isinf(obj):
             return None
         return float(obj)
     elif isinstance(obj, np.bool_):
         return bool(obj)
-    # Only call pd.isna on scalar-safe types to avoid ambiguous truth value errors
     elif isinstance(obj, float):
         if pd.isna(obj) or np.isinf(obj):
             return None
@@ -94,12 +91,12 @@ async def upload_dataset(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    # Validate file extension
+    # Validar extensión
     valid_extensions = (".csv", ".xlsx", ".xls", ".json")
     if not any(file.filename.endswith(ext) for ext in valid_extensions):
         raise HTTPException(status_code=400, detail="Unsupported file format.")
 
-    # Read content and validate size before writing to disk
+    # Leer y validar tamaño antes de escribir al disco
     content = await file.read()
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
@@ -118,7 +115,6 @@ async def upload_dataset(
         db.commit()
 
         logger.info(f"Dataset uploaded: {file_id} ({file.filename})")
-
         background_tasks.add_task(run_analysis_pipeline, file_id, file_path)
 
         return {
@@ -128,7 +124,6 @@ async def upload_dataset(
         }
     except Exception as e:
         logger.error(f"Upload error: {e}")
-        # Cleanup file if something went wrong after writing
         if os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail="Failed to upload dataset")
@@ -149,7 +144,7 @@ async def get_analysis(file_id: str, db: Session = Depends(get_db)):
 
 
 def run_analysis_pipeline(file_id: str, file_path: str):
-    """Runs in background — uses its own DB session."""
+    """Corre en background — maneja su propia sesión de DB."""
     db = SessionLocal()
     analysis = None
     try:
@@ -161,6 +156,9 @@ def run_analysis_pipeline(file_id: str, file_path: str):
         logger.info(f"Starting pipeline for {file_id}")
         result = process_dataset(file_path)
         logger.info(f"Process result type: {type(result)}")
+
+        if result is None:
+            raise ValueError("process_dataset devolvió None — revisar data_pipeline.py")
 
         insights = generate_business_insights(result)
         result["business_insights"] = insights
@@ -178,7 +176,6 @@ def run_analysis_pipeline(file_id: str, file_path: str):
             analysis.error = str(e)
             db.commit()
         else:
-            # Try to fetch and mark as failed even if initial fetch failed
             try:
                 analysis = db.get(DatasetAnalysis, file_id)
                 if analysis:
