@@ -1,32 +1,40 @@
 ﻿import os
+import logging
 from datetime import datetime
 from sqlalchemy import JSON, Column, DateTime, String, Integer, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from typing import Generator
 
+# Configurar logging profesional
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 is_serverless = os.environ.get("VERCEL") or os.environ.get("RENDER") or os.environ.get("PORT")
 default_sqlite_path = "/tmp/local.db" if is_serverless else "./local.db"
 
-# Render provides DATABASE_URL for Postgres
 DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
+
+if DATABASE_URL:
+    # Arreglo critico para Render/Heroku: postgres:// -> postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    # Soporte SSL para Render
+    if "sslmode=" not in DATABASE_URL and "sqlite" not in DATABASE_URL:
+        DATABASE_URL += ("&" if "?" in DATABASE_URL else "?") + "sslmode=require"
+    logger.info("Using Production Database (PostgreSQL)")
+else:
     DATABASE_URL = f"sqlite:///{default_sqlite_path}"
-    # Ensure local directory exists for SQLite
-    if not is_serverless:
-        os.makedirs(os.path.dirname(os.path.abspath(default_sqlite_path)), exist_ok=True)
+    logger.info(f"Using Local Database (SQLite): {DATABASE_URL}")
 
-# Handle Postgres SSL requirement for Render
-connect_args = {}
-if DATABASE_URL.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
-elif DATABASE_URL.startswith("postgresql"):
-    # Render Postgres often requires SSL
-    if "?sslmode=" not in DATABASE_URL:
-        DATABASE_URL += "?sslmode=require"
-
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+try:
+    connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+    engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    Base = declarative_base()
+except Exception as e:
+    logger.error(f"Error creating engine: {e}")
+    raise
 
 class DatasetAnalysis(Base):
     __tablename__ = "dataset_analysis"
@@ -49,7 +57,11 @@ class User(Base):
     last_reset = Column(DateTime, default=datetime.utcnow)
 
 def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schemas initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
