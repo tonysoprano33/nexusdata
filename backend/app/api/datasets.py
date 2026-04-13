@@ -1,7 +1,12 @@
 ﻿import numpy as np
 import pandas as pd
 
+import numpy as np
+import pandas as pd
+
 def make_json_serializable(obj):
+    if obj is None:
+        return None
     if isinstance(obj, dict):
         return {str(k): make_json_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple, np.ndarray)):
@@ -130,7 +135,7 @@ def run_analysis_pipeline(file_id: str, file_path: str):
     db = SessionLocal()
     try:
         logger.info(f"Starting pipeline for {file_id}")
-        result = process_dataset(file_path)
+        result = process_dataset(file_path); logger.info(f"Process result type: {type(result)}")
         insights = generate_business_insights(result)
         result["business_insights"] = insights
 
@@ -195,4 +200,5 @@ async def chat_dataset(file_id: str, question: str, db: Session = Depends(get_db
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail="AI failed to respond")
+
 
