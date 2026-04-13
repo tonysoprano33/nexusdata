@@ -24,7 +24,8 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://nexusdata-ai-dashboard-kiyudk509-tonysoprano3s-projects.vercel.app",
-    "https://*.vercel.app"  # Permitir todos los subdominios de Vercel
+    "https://*.vercel.app",  # Permitir todos los subdominios de Vercel
+    "https://nexusdata-api.onrender.com"  # URL del backend en Render
 ]
 
 app.add_middleware(
