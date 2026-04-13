@@ -133,11 +133,10 @@ def process_dataset(file_path: str):
         advanced_analytics = run_all_advanced_analytics(df_clean, column_types)
         result["advanced_analytics"] = advanced_analytics
     except Exception as e:
-        print(f"Error en anÃ¡lisis avanzados: {e}")
+        print(f"Error en análisis avanzados: {e}")
         result["advanced_analytics"] = {}
-    
-    
-        return result
+
+    return result  # ← al nivel de la función, siempre se ejecuta
 
 
 
