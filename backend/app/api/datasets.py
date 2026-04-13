@@ -1,4 +1,23 @@
-﻿import os
+﻿import numpy as np
+import pandas as pd
+
+def make_json_serializable(obj):
+    if isinstance(obj, dict):
+        return {str(k): make_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple, np.ndarray)):
+        return [make_json_serializable(i) for i in obj]
+    elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+        return int(obj)
+    elif isinstance(obj, (np.float64, np.float32, np.float16)):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return float(obj)
+    elif isinstance(obj, (np.bool_)):
+        return bool(obj)
+    elif pd.isna(obj):
+        return None
+    return obj
+import os
 import uuid
 import logging
 from datetime import datetime
@@ -118,7 +137,7 @@ def run_analysis_pipeline(file_id: str, file_path: str):
         analysis = db.get(DatasetAnalysis, file_id)
         if analysis:
             analysis.status = "completed"
-            analysis.analysis_result = result
+            analysis.analysis_result = make_json_serializable(result)
             analysis.error = None
             db.commit()
             logger.info(f"Pipeline completed for {file_id}")
@@ -176,3 +195,4 @@ async def chat_dataset(file_id: str, question: str, db: Session = Depends(get_db
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail="AI failed to respond")
+

@@ -137,26 +137,7 @@ def process_dataset(file_path: str):
         result["advanced_analytics"] = {}
     
     
-        # --- FIX DEFINITIVO PARA SERIALIZACION JSON ---
-    import numpy as np
+        return result
 
-    def json_safe(obj):
-        if isinstance(obj, dict):
-            return {str(k): json_safe(v) for k, v in obj.items()}
-        elif isinstance(obj, list) or isinstance(obj, np.ndarray):
-            return [json_safe(i) for i in obj]
-        elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
-            return int(obj)
-        elif isinstance(obj, (np.float64, np.float32, np.float16)):
-            if np.isnan(obj) or np.isinf(obj):
-                return None
-            return float(obj)
-        elif isinstance(obj, (np.bool_)):
-            return bool(obj)
-        elif pd.isna(obj):
-            return None
-        return obj
-
-    return json_safe(result)
 
 
