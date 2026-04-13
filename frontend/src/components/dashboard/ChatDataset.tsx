@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState } from "react";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE_URL = 'https://nexusdata-api.onrender.com/api';
 
 export function ChatDataset({ datasetId }: { datasetId: string }) {
   const [messages, setMessages] = useState<Array<{id: string; type: 'user' | 'bot'; content: string}>>([]);     
@@ -22,7 +22,7 @@ export function ChatDataset({ datasetId }: { datasetId: string }) {
     setLoading(true);
 
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`);
+      const { data } = await axios.post(`https://nexusdata-api.onrender.com/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`);
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: data.answer }]);  
     } catch {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: "Error processing your question. Please try again." }]);

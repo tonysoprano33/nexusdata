@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ export default function ChatDataset({ datasetId }: ChatDatasetProps) {
   useEffect(() => {
     const loadSuggestions = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/datasets/${datasetId}/chat/questions`);
+        const response = await axios.get(`https://nexusdata-api.onrender.com/api/datasets/${datasetId}/chat/questions`);
         setSuggestedQuestions(response.data.questions || []);
       } catch (error) {
         console.error("Error loading suggestions:", error);
@@ -46,7 +46,7 @@ export default function ChatDataset({ datasetId }: ChatDatasetProps) {
     loadSuggestions();
   }, [datasetId]);
 
-  // Scroll automático al final
+  // Scroll automÃ¡tico al final
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -69,7 +69,7 @@ export default function ChatDataset({ datasetId }: ChatDatasetProps) {
 
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`
+        `https://nexusdata-api.onrender.com/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`
       );
 
       const botMessage: Message = {
@@ -84,7 +84,7 @@ export default function ChatDataset({ datasetId }: ChatDatasetProps) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
-        content: "⚠️ Error al procesar tu pregunta. Intenta de nuevo.",
+        content: "âš ï¸ Error al procesar tu pregunta. Intenta de nuevo.",
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -106,7 +106,7 @@ export default function ChatDataset({ datasetId }: ChatDatasetProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-indigo-400" />
-            Pregúntale al Dataset
+            PregÃºntale al Dataset
             <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-xs">
               <Sparkles className="h-3 w-3 mr-1" />
               IA

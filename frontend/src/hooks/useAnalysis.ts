@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import type { AnalysisResponse } from "@/types/analysis";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE_URL = 'https://nexusdata-api.onrender.com/api';
 
 export function useAnalysis(datasetId: string) {
   const [data, setData] = useState<AnalysisResponse["result"] | null>(null);
@@ -25,7 +25,7 @@ export function useAnalysis(datasetId: string) {
 
     const fetchData = async () => {
       try {
-        const response = await axios.get<AnalysisResponse>(`${API_BASE_URL}/api/datasets/${datasetId}`);
+        const response = await axios.get<AnalysisResponse>(`https://nexusdata-api.onrender.com/api/datasets/${datasetId}`);
         const payload = response.data;
 
         if (payload.status === "completed") {
