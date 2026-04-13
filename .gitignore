@@ -1,0 +1,36 @@
+# Vercel
+.vercel
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.env
+local.db
+*.sqlite3
+
+# Node.js
+node_modules/
+.next/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads (temporary files)
+backend/uploads/
+!backend/uploads/.gitkeep
+
