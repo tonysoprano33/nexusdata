@@ -1,38 +1,18 @@
-﻿import numpy as np
-import pandas as pd
-
-import numpy as np
-import pandas as pd
-
-def make_json_serializable(obj):
-    if obj is None:
-        return None
-    if isinstance(obj, dict):
-        return {str(k): make_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple, np.ndarray)):
-        return [make_json_serializable(i) for i in obj]
-    elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
-        return int(obj)
-    elif isinstance(obj, (np.float64, np.float32, np.float16)):
-        if np.isnan(obj) or np.isinf(obj):
-            return None
-        return float(obj)
-    elif isinstance(obj, (np.bool_)):
-        return bool(obj)
-    elif pd.isna(obj):
-        return None
-    return obj
-import os
+﻿import os
 import uuid
 import logging
 from datetime import datetime
 from typing import List, Optional
 
+import numpy as np
+import pandas as pd
+
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile, Depends
+from fastapi.responses import Response
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.db.database import DatasetAnalysis, get_db
+from app.db.database import DatasetAnalysis, SessionLocal, get_db
 from app.services.data_pipeline import process_dataset
 from app.services.agent_reasoning import generate_business_insights
 from app.services.pdf_generator import generate_pdf_report
@@ -45,8 +25,36 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-UPLOAD_DIR = "/tmp/uploads" if os.environ.get("VERCEL") else "uploads"
+UPLOAD_DIR = "/tmp/uploads" if os.environ.get("RENDER") else "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+MAX_FILE_SIZE_MB = 50
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+
+def make_json_serializable(obj):
+    """Recursively convert numpy/pandas types to JSON-serializable Python types."""
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return {str(k): make_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple, np.ndarray)):
+        return [make_json_serializable(i) for i in obj]
+    elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+        return int(obj)
+    elif isinstance(obj, (np.float64, np.float32, np.float16)):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    # Only call pd.isna on scalar-safe types to avoid ambiguous truth value errors
+    elif isinstance(obj, float):
+        if pd.isna(obj) or np.isinf(obj):
+            return None
+        return obj
+    return obj
+
 
 @router.get("/")
 async def list_analyses(
@@ -82,29 +90,37 @@ async def list_analyses(
 
 @router.post("/upload")
 async def upload_dataset(
-    background_tasks: BackgroundTasks, 
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    # Validate file extension
     valid_extensions = (".csv", ".xlsx", ".xls", ".json")
     if not any(file.filename.endswith(ext) for ext in valid_extensions):
         raise HTTPException(status_code=400, detail="Unsupported file format.")
+
+    # Read content and validate size before writing to disk
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum allowed size is {MAX_FILE_SIZE_MB} MB."
+        )
 
     file_id = str(uuid.uuid4())
     file_path = os.path.join(UPLOAD_DIR, f"{file_id}_{file.filename}")
 
     try:
         with open(file_path, "wb") as buffer:
-            content = await file.read()
             buffer.write(content)
-        
+
         db.add(DatasetAnalysis(id=file_id, filename=file.filename, status="processing"))
         db.commit()
-        
+
         logger.info(f"Dataset uploaded: {file_id} ({file.filename})")
-        
+
         background_tasks.add_task(run_analysis_pipeline, file_id, file_path)
-        
+
         return {
             "id": file_id,
             "status": "processing",
@@ -112,6 +128,9 @@ async def upload_dataset(
         }
     except Exception as e:
         logger.error(f"Upload error: {e}")
+        # Cleanup file if something went wrong after writing
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise HTTPException(status_code=500, detail="Failed to upload dataset")
 
 
@@ -130,35 +149,50 @@ async def get_analysis(file_id: str, db: Session = Depends(get_db)):
 
 
 def run_analysis_pipeline(file_id: str, file_path: str):
-    # This runs in background, manual session management is needed here
-    from app.db.database import SessionLocal
+    """Runs in background — uses its own DB session."""
     db = SessionLocal()
+    analysis = None
     try:
+        analysis = db.get(DatasetAnalysis, file_id)
+        if not analysis:
+            logger.error(f"Analysis record not found for {file_id}")
+            return
+
         logger.info(f"Starting pipeline for {file_id}")
-        result = process_dataset(file_path); logger.info(f"Process result type: {type(result)}")
+        result = process_dataset(file_path)
+        logger.info(f"Process result type: {type(result)}")
+
         insights = generate_business_insights(result)
         result["business_insights"] = insights
 
-        analysis = db.get(DatasetAnalysis, file_id)
-        if analysis:
-            analysis.status = "completed"
-            analysis.analysis_result = make_json_serializable(result)
-            analysis.error = None
-            db.commit()
-            logger.info(f"Pipeline completed for {file_id}")
+        analysis.status = "completed"
+        analysis.analysis_result = make_json_serializable(result)
+        analysis.error = None
+        db.commit()
+        logger.info(f"Pipeline completed for {file_id}")
+
     except Exception as e:
         logger.error(f"Pipeline failed for {file_id}: {e}")
-        analysis = db.get(DatasetAnalysis, file_id)
         if analysis:
             analysis.status = "failed"
             analysis.error = str(e)
             db.commit()
+        else:
+            # Try to fetch and mark as failed even if initial fetch failed
+            try:
+                analysis = db.get(DatasetAnalysis, file_id)
+                if analysis:
+                    analysis.status = "failed"
+                    analysis.error = str(e)
+                    db.commit()
+            except Exception as inner_e:
+                logger.error(f"Could not update failed status for {file_id}: {inner_e}")
     finally:
         db.close()
-        # Cleanup file after processing
         if os.path.exists(file_path):
             os.remove(file_path)
             logger.info(f"Cleaned up file: {file_path}")
+
 
 @router.get("/{file_id}/export/{format}")
 async def export_report(file_id: str, format: str, db: Session = Depends(get_db)):
@@ -173,17 +207,17 @@ async def export_report(file_id: str, format: str, db: Session = Depends(get_db)
         report_bytes = generate_pptx_report({"result": analysis.analysis_result})
         media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     else:
-        raise HTTPException(status_code=400, detail="Invalid format")
+        raise HTTPException(status_code=400, detail="Invalid format. Use 'pdf' or 'pptx'.")
 
     if not report_bytes:
         raise HTTPException(status_code=500, detail=f"Failed to generate {format} report")
 
-    from fastapi.responses import Response
     return Response(
         content=report_bytes,
         media_type=media_type,
         headers={"Content-Disposition": f"attachment; filename=report_{file_id[:8]}.{format}"}
     )
+
 
 @router.post("/{file_id}/chat")
 async def chat_dataset(file_id: str, question: str, db: Session = Depends(get_db)):
@@ -192,13 +226,11 @@ async def chat_dataset(file_id: str, question: str, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail="Ready analysis not found")
 
     result = analysis.analysis_result or {}
-    sample_data = result.get('sample_data', [])
-    
+    sample_data = result.get("sample_data", [])
+
     try:
         answer = chat_with_dataset(question, result, sample_data)
         return {"question": question, "answer": answer}
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail="AI failed to respond")
-
-
