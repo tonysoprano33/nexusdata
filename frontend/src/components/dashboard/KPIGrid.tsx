@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { KpiCard } from "@/components/enterprise/KpiCard";
 import { Database, CheckCircle2, FileWarning, BarChart3 } from "lucide-react";
 import type { AnalysisResponse } from "@/types/analysis";
@@ -18,14 +18,14 @@ export function KPIGrid({ summary, anomaly_detection, column_types }: KPIGridPro
       <KpiCard
         title="Total Records"
         value={summary.total_rows.toLocaleString()}
-        subtitle={${summary.total_columns} columns analyzed}
+        subtitle={`${summary.total_columns} columns analyzed`}
         icon={Database}
         color="blue"
         delay={0}
       />
       <KpiCard
         title="Data Quality"
-        value={${summary.data_quality_score ?? 0}%}
+        value={`${summary.data_quality_score ?? 0}%`}
         subtitle={summary.data_quality_score && summary.data_quality_score >= 90 ? "Excellent" : "Needs attention"}
         icon={CheckCircle2}
         color={summary.data_quality_score && summary.data_quality_score >= 85 ? "emerald" : "amber"}
@@ -34,7 +34,7 @@ export function KPIGrid({ summary, anomaly_detection, column_types }: KPIGridPro
       <KpiCard
         title="Anomalies"
         value={anomaly_detection?.detected_rows ?? 0}
-        subtitle={${((anomaly_detection?.ratio ?? 0) * 100).toFixed(2)}% of dataset}
+        subtitle={`${((anomaly_detection?.ratio ?? 0) * 100).toFixed(2)}% of dataset`}
         icon={FileWarning}
         color={(anomaly_detection?.detected_rows || 0) > 0 ? "amber" : "emerald"}
         delay={0.2}
@@ -42,7 +42,7 @@ export function KPIGrid({ summary, anomaly_detection, column_types }: KPIGridPro
       <KpiCard
         title="Fields"
         value={numericCount}
-        subtitle={${categoricalCount} categorical}
+        subtitle={`${categoricalCount} categorical`}
         icon={BarChart3}
         color="violet"
         delay={0.3}
