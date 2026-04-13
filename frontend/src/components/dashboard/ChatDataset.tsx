@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -7,10 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import axios from "axios";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "https://nexusdata-api.onrender.com";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export function ChatDataset({ datasetId }: { datasetId: string }) {
   const [messages, setMessages] = useState<Array<{id: string; type: 'user' | 'bot'; content: string}>>([]);     
@@ -25,7 +22,7 @@ export function ChatDataset({ datasetId }: { datasetId: string }) {
     setLoading(true);
 
     try {
-      const { data } = await axios.post(${API_BASE_URL}/api/datasets//chat?question=);
+      const { data } = await axios.post(`${API_BASE_URL}/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`);
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: data.answer }]);  
     } catch {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: "Error processing your question. Please try again." }]);
@@ -57,8 +54,8 @@ export function ChatDataset({ datasetId }: { datasetId: string }) {
           ) : (
             <div className="space-y-4">
               {messages.map((msg) => (
-                <div key={msg.id} className={lex }>  
-                  <div className={max-w-[85%] p-3 rounded-xl text-xs }>
+                <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>  
+                  <div className={`max-w-[85%] p-3 rounded-xl text-xs ${msg.type === 'user' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-neutral-800 text-neutral-200 border border-white/5'}`}>
                     {msg.content}
                   </div>
                 </div>

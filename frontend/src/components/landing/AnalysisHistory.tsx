@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Search, Loader2, CheckCircle2, XCircle, FileSpreadsheet, BarChart3, Sparkles } from "lucide-react";
@@ -6,14 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AnalysisHistory as AnalysisHistoryType } from "@/types/analysis";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "https://nexusdata-api.onrender.com";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export function AnalysisHistory() {
   const [history, setHistory] = useState<AnalysisHistoryType[]>([]);
@@ -27,7 +23,7 @@ export function AnalysisHistory() {
         const params = new URLSearchParams();
         params.set("limit", "12");
         if (historyStatusFilter !== "all") params.set("status", historyStatusFilter);
-        const { data } = await axios.get<AnalysisHistoryType[]>(${API_BASE_URL}/api/datasets/?);
+        const { data } = await axios.get<AnalysisHistoryType[]>(`${API_BASE_URL}/api/datasets/?` + params.toString());
         setHistory(data);
       } catch (error) {
         console.error("Error loading history", error);
@@ -64,7 +60,9 @@ export function AnalysisHistory() {
               size="sm"
               variant={historyStatusFilter === key ? "default" : "outline"}
               onClick={() => { setLoading(true); setHistoryStatusFilter(key as any); }}
-              className={capitalize }
+              className={`capitalize ${
+                historyStatusFilter === key ? "bg-indigo-600 text-white" : "border-white/10 text-neutral-400"
+              }`}
             >
               {key}
             </Button>
@@ -95,7 +93,7 @@ export function AnalysisHistory() {
             </div>
           ) : (
             filteredHistory.map((item, index) => (
-              <AnalysisCard key={item.id} item={item} index={index} onClick={() => router.push(/dashboard/)} />
+              <AnalysisCard key={item.id} item={item} index={index} onClick={() => router.push(`/dashboard/${item.id}`)} />
             ))
           )}
         </AnimatePresence>
@@ -122,7 +120,7 @@ function AnalysisCard({ item, index, onClick }: { item: AnalysisHistoryType; ind
         className="group bg-neutral-900/40 border-white/10 hover:border-indigo-500/40 transition-all cursor-pointer overflow-hidden relative shadow-lg"
         onClick={onClick}
       >
-        <div className={h-1 w-full } />
+        <div className={`h-1 w-full ${item.status === "completed" ? "bg-emerald-500/50" : item.status === "processing" ? "bg-amber-500/50" : "bg-rose-500/50"}`} />
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex-1 min-w-0">
@@ -134,9 +132,9 @@ function AnalysisCard({ item, index, onClick }: { item: AnalysisHistoryType; ind
                 {item.created_at ? new Date(item.created_at).toLocaleDateString() : "No date"}
               </p>
             </div>
-            <div className={lex items-center gap-1.5 px-2 py-1 rounded-md  border }>
-              <config.icon className={h-3 w-3  } />
-              <span className={	ext-[10px] font-bold uppercase tracking-wider }>{config.label}</span>
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${config.bg} border ${config.border}`}>
+              <config.icon className={`h-3 w-3 ${config.color} ${config.spin ? 'animate-spin' : ''}`} />
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${config.color}`}>{config.label}</span>
             </div>
           </div>
 

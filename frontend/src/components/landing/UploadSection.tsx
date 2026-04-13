@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, ChevronRight, BarChart2, Loader2 } from "lucide-react";
@@ -7,10 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import axios from "axios";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "https://nexusdata-api.onrender.com";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export function UploadSection() {
   const [file, setFile] = useState<File | null>(null);
@@ -30,18 +27,19 @@ export function UploadSection() {
     formData.append("file", file);
 
     try {
-      const { data } = await axios.post(${API_BASE_URL}/api/datasets/upload, formData, {
+      const { data } = await axios.post(`${API_BASE_URL}/api/datasets/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      if (typeof window !== "undefined" && data?.result) {
-        window.localStorage.setItem(nalysis:, JSON.stringify(data.result));
+      if (typeof window !== "undefined" && data?.id) {
+        if (data.result) {
+          window.localStorage.setItem(`analysis:${data.id}`, JSON.stringify(data.result));
+        }
+        router.push(`/dashboard/${data.id}`);
       }
-      router.push(/dashboard/);
     } catch (error) {
       console.error(error);
       setUploading(false);
-      // Integration of Sonner or Toast would go here
-      alert("Error uploading file.");
+      alert("Error uploading file. Check console for details.");
     }
   };
 
@@ -52,7 +50,9 @@ export function UploadSection() {
           <label
             onDragOver={handleDragOver}
             onDrop={handleDrop}
-            className={lex flex-col items-center justify-center p-12 cursor-pointer border-2 border-dashed transition-all duration-300 }
+            className={`flex flex-col items-center justify-center p-12 cursor-pointer border-2 border-dashed transition-all duration-300 ${
+              file ? "border-indigo-500/50 bg-indigo-500/5" : "border-neutral-800 hover:border-neutral-700 hover:bg-white/5"
+            }`}
           >
             <input
               type="file"
@@ -62,11 +62,11 @@ export function UploadSection() {
             />
             {file ? (
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-indigo-500/20 flex items-center justify-center">  
+                <div className="h-12 w-12 rounded-full bg-indigo-500/20 flex items-center justify-center">      
                   <BarChart2 className="text-indigo-400" />
                 </div>
                 <span className="text-lg font-medium text-white">{file.name}</span>
-                <span className="text-sm text-neutral-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> 
+                <span className="text-sm text-neutral-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span>     
               </motion.div>
             ) : (
               <div className="flex flex-col items-center gap-3 text-center">
