@@ -1,17 +1,23 @@
-import os
+﻿import os
 import uuid
+import logging
 from datetime import datetime
+from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile, Depends
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.db.database import DatasetAnalysis, SessionLocal
+from app.db.database import DatasetAnalysis, get_db
 from app.services.data_pipeline import process_dataset
 from app.services.agent_reasoning import generate_business_insights
 from app.services.pdf_generator import generate_pdf_report
 from app.services.pptx_generator import generate_pptx_report
 from app.services.chat_service import chat_with_dataset, generate_sample_questions
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -20,31 +26,14 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.get("/")
 async def list_analyses(
-    status: str | None = Query(default=None),
-    from_date: str | None = Query(default=None),
-    to_date: str | None = Query(default=None),
-    limit: int = Query(default=20, ge=1, le=100),
+    status: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db)
 ):
-    db: Session = SessionLocal()
     try:
-        parsed_from_date = None
-        parsed_to_date = None
-        try:
-            parsed_from_date = datetime.fromisoformat(from_date) if from_date else None
-            parsed_to_date = datetime.fromisoformat(to_date) if to_date else None
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid date format. Use ISO-8601 (e.g. 2026-04-13T12:00:00).",
-            ) from exc
-
         query = db.query(DatasetAnalysis)
         if status:
             query = query.filter(DatasetAnalysis.status == status)
-        if parsed_from_date:
-            query = query.filter(DatasetAnalysis.created_at >= parsed_from_date)
-        if parsed_to_date:
-            query = query.filter(DatasetAnalysis.created_at <= parsed_to_date)
 
         records = query.order_by(desc(DatasetAnalysis.created_at)).limit(limit).all()
         return [
@@ -58,84 +47,70 @@ async def list_analyses(
                     if row.analysis_result
                     else None
                 ),
+                "summary": row.analysis_result.get("summary") if row.analysis_result else None
             }
             for row in records
         ]
-    finally:
-        db.close()
+    except Exception as e:
+        logger.error(f"Error listing analyses: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/upload")
-async def upload_dataset(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported.")
+async def upload_dataset(
+    background_tasks: BackgroundTasks, 
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    valid_extensions = (".csv", ".xlsx", ".xls", ".json")
+    if not any(file.filename.endswith(ext) for ext in valid_extensions):
+        raise HTTPException(status_code=400, detail="Unsupported file format.")
 
     file_id = str(uuid.uuid4())
     file_path = os.path.join(UPLOAD_DIR, f"{file_id}_{file.filename}")
 
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
-
-    db: Session = SessionLocal()
     try:
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
         db.add(DatasetAnalysis(id=file_id, filename=file.filename, status="processing"))
         db.commit()
-    finally:
-        db.close()
-
-    if os.environ.get("VERCEL"):
-        run_analysis_pipeline(file_id, file_path)
-
-        db = SessionLocal()
-        try:
-            analysis = db.get(DatasetAnalysis, file_id)
-            if not analysis:
-                raise HTTPException(status_code=500, detail="Analysis could not be stored.")
-
-            payload = {
-                "id": file_id,
-                "status": analysis.status,
-                "message": "Dataset uploaded and analyzed successfully.",
-                "result": analysis.analysis_result,
-            }
-            if analysis.error:
-                payload["error"] = analysis.error
-            return payload
-        finally:
-            db.close()
-
-    background_tasks.add_task(run_analysis_pipeline, file_id, file_path)
-    return {
-        "id": file_id,
-        "status": "processing",
-        "message": "Dataset uploaded successfully and is being processed.",
-    }
+        
+        logger.info(f"Dataset uploaded: {file_id} ({file.filename})")
+        
+        background_tasks.add_task(run_analysis_pipeline, file_id, file_path)
+        
+        return {
+            "id": file_id,
+            "status": "processing",
+            "message": "Dataset uploaded successfully and is being processed.",
+        }
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload dataset")
 
 
 @router.get("/{file_id}")
-async def get_analysis(file_id: str):
-    db: Session = SessionLocal()
-    try:
-        analysis = db.get(DatasetAnalysis, file_id)
-    finally:
-        db.close()
-
+async def get_analysis(file_id: str, db: Session = Depends(get_db)):
+    analysis = db.get(DatasetAnalysis, file_id)
     if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found or expired.")
+        raise HTTPException(status_code=404, detail="Analysis not found.")
 
-    payload = {
+    return {
         "id": analysis.id,
         "status": analysis.status,
         "result": analysis.analysis_result,
+        "error": analysis.error
     }
-    if analysis.error:
-        payload["error"] = analysis.error
-    return payload
 
 
 def run_analysis_pipeline(file_id: str, file_path: str):
-    db: Session = SessionLocal()
+    # This runs in background, manual session management is needed here
+    from app.db.database import SessionLocal
+    db = SessionLocal()
     try:
+        logger.info(f"Starting pipeline for {file_id}")
         result = process_dataset(file_path)
         insights = generate_business_insights(result)
         result["business_insights"] = insights
@@ -146,7 +121,9 @@ def run_analysis_pipeline(file_id: str, file_path: str):
             analysis.analysis_result = result
             analysis.error = None
             db.commit()
+            logger.info(f"Pipeline completed for {file_id}")
     except Exception as e:
+        logger.error(f"Pipeline failed for {file_id}: {e}")
         analysis = db.get(DatasetAnalysis, file_id)
         if analysis:
             analysis.status = "failed"
@@ -154,119 +131,48 @@ def run_analysis_pipeline(file_id: str, file_path: str):
             db.commit()
     finally:
         db.close()
+        # Cleanup file after processing
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Cleaned up file: {file_path}")
 
+@router.get("/{file_id}/export/{format}")
+async def export_report(file_id: str, format: str, db: Session = Depends(get_db)):
+    analysis = db.get(DatasetAnalysis, file_id)
+    if not analysis or analysis.status != "completed":
+        raise HTTPException(status_code=404, detail="Ready analysis not found")
 
-@router.get("/{file_id}/export/pdf")
-async def export_pdf(file_id: str):
-    """Exporta el análisis completo como PDF"""
-    db: Session = SessionLocal()
-    try:
-        analysis = db.get(DatasetAnalysis, file_id)
-        if not analysis:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        
-        if analysis.status != "completed":
-            raise HTTPException(status_code=400, detail="Analysis not completed yet")
-        
-        # Generar PDF
-        pdf_bytes = generate_pdf_report({"result": analysis.analysis_result})
-        
-        if pdf_bytes is None:
-            raise HTTPException(status_code=500, detail="PDF generation failed. Install reportlab.")
-        
-        from fastapi.responses import Response
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename=reporte_{file_id[:8]}.pdf"
-            }
-        )
-    finally:
-        db.close()
+    if format == "pdf":
+        report_bytes = generate_pdf_report({"result": analysis.analysis_result})
+        media_type = "application/pdf"
+    elif format == "pptx":
+        report_bytes = generate_pptx_report({"result": analysis.analysis_result})
+        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid format")
 
+    if not report_bytes:
+        raise HTTPException(status_code=500, detail=f"Failed to generate {format} report")
 
-@router.get("/{file_id}/export/pptx")
-async def export_pptx(file_id: str):
-    """Exporta el análisis completo como PowerPoint"""
-    db: Session = SessionLocal()
-    try:
-        analysis = db.get(DatasetAnalysis, file_id)
-        if not analysis:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        
-        if analysis.status != "completed":
-            raise HTTPException(status_code=400, detail="Analysis not completed yet")
-        
-        # Generar PowerPoint
-        pptx_bytes = generate_pptx_report({"result": analysis.analysis_result})
-        
-        if pptx_bytes is None:
-            raise HTTPException(status_code=500, detail="PowerPoint generation failed. Install python-pptx.")
-        
-        from fastapi.responses import Response
-        return Response(
-            content=pptx_bytes,
-            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            headers={
-                "Content-Disposition": f"attachment; filename=reporte_{file_id[:8]}.pptx"
-            }
-        )
-    finally:
-        db.close()
-
+    from fastapi.responses import Response
+    return Response(
+        content=report_bytes,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename=report_{file_id[:8]}.{format}"}
+    )
 
 @router.post("/{file_id}/chat")
-async def chat_dataset(file_id: str, question: str = Query(..., description="Pregunta sobre el dataset")):
-    """
-    Chat con el dataset - hacer preguntas en lenguaje natural
-    """
-    db: Session = SessionLocal()
+async def chat_dataset(file_id: str, question: str, db: Session = Depends(get_db)):
+    analysis = db.get(DatasetAnalysis, file_id)
+    if not analysis or analysis.status != "completed":
+        raise HTTPException(status_code=404, detail="Ready analysis not found")
+
+    result = analysis.analysis_result or {}
+    sample_data = result.get('sample_data', [])
+    
     try:
-        analysis = db.get(DatasetAnalysis, file_id)
-        if not analysis:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        
-        if analysis.status != "completed":
-            raise HTTPException(status_code=400, detail="Analysis not completed yet")
-        
-        result = analysis.analysis_result or {}
-        
-        # Extraer muestra de datos si existe
-        sample_data = result.get('sample_data', [])
-        
-        # Generar respuesta
         answer = chat_with_dataset(question, result, sample_data)
-        
-        return {
-            "question": question,
-            "answer": answer,
-            "dataset_id": file_id
-        }
-    finally:
-        db.close()
-
-
-@router.get("/{file_id}/chat/questions")
-async def get_sample_questions(file_id: str):
-    """
-    Obtener preguntas de ejemplo para el dataset
-    """
-    db: Session = SessionLocal()
-    try:
-        analysis = db.get(DatasetAnalysis, file_id)
-        if not analysis:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        
-        if analysis.status != "completed":
-            raise HTTPException(status_code=400, detail="Analysis not completed yet")
-        
-        result = analysis.analysis_result or {}
-        questions = generate_sample_questions(result)
-        
-        return {
-            "questions": questions,
-            "dataset_id": file_id
-        }
-    finally:
-        db.close()
+        return {"question": question, "answer": answer}
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail="AI failed to respond")
