@@ -4,7 +4,10 @@ from datetime import datetime
 from sqlalchemy import JSON, Column, DateTime, String, Integer, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-default_sqlite_path = "/tmp/local.db" if os.environ.get("VERCEL") else "./local.db"
+# Usar /tmp para SQLite en serverless/producción (efímero pero funcional)
+# Render y Vercel no persisten archivos locales entre deploys
+is_serverless = os.environ.get("VERCEL") or os.environ.get("RENDER") or os.environ.get("PORT")
+default_sqlite_path = "/tmp/local.db" if is_serverless else "./local.db"
 
 # Usar SQLite por defecto (no requiere servidor PostgreSQL)
 # Para producción, cambiar a: postgresql://user:pass@localhost:5432/dbname
