@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "../src/app/globals.css";
+import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NexusData AI",
-  description: "Plataforma SaaS para analisis automatizado de datos con IA.",
+  title: "NexusData AI - Professional Data Intelligence",
+  description: "Analyze, clean and visualize your data with AI power",
 };
 
 export default function RootLayout({
@@ -23,11 +23,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en">
+      <body className={${geistSans.variable}  antialiased bg-black}>
+        {children}
+      </body>
     </html>
   );
 }
