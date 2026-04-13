@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -17,10 +17,10 @@ import { usePathname } from "next/navigation";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Datasets", href: "/datasets", icon: Database },
-  { name: "Intelligence", href: "/intelligence", icon: Brain },
-  { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Datasets", href: "#", icon: Database },
+  { name: "Intelligence", href: "#", icon: Brain },
+  { name: "Reports", href: "#", icon: FileText },
+  { name: "Settings", href: "#", icon: Settings },
 ];
 
 interface EnterpriseSidebarProps {
@@ -146,3 +146,4 @@ export function EnterpriseSidebar({ collapsed, onToggle }: EnterpriseSidebarProp
     </motion.aside>
   );
 }
+
