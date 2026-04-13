@@ -137,18 +137,26 @@ def process_dataset(file_path: str):
         result["advanced_analytics"] = {}
     
     
-    # Limpieza final de tipos para JSON (int64 -> int)
-    import json
-    def clean_types(obj):
+        # --- FIX DEFINITIVO PARA SERIALIZACION JSON ---
+    import numpy as np
+
+    def json_safe(obj):
         if isinstance(obj, dict):
-            return {k: clean_types(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [clean_types(i) for i in obj]
-        elif hasattr(obj, "item"): # Para numpy types
-            return obj.item()
-        elif isinstance(obj, (float, int)) and pd.isna(obj):
+            return {str(k): json_safe(v) for k, v in obj.items()}
+        elif isinstance(obj, list) or isinstance(obj, np.ndarray):
+            return [json_safe(i) for i in obj]
+        elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+            return int(obj)
+        elif isinstance(obj, (np.float64, np.float32, np.float16)):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return float(obj)
+        elif isinstance(obj, (np.bool_)):
+            return bool(obj)
+        elif pd.isna(obj):
             return None
         return obj
-    
-    return clean_types(result)
+
+    return json_safe(result)
+
 
