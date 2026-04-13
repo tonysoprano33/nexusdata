@@ -16,3 +16,4 @@ passlib[bcrypt]
 python-dotenv
 openpyxl
 python-pptx
+pydantic[email]
