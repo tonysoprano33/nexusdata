@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, ChevronRight, BarChart2, Loader2 } from "lucide-react";
@@ -42,23 +42,47 @@ export function UploadSection() {
           <label className="flex flex-col items-center justify-center p-12 cursor-pointer border-2 border-dashed border-neutral-800 hover:border-indigo-500/50 transition-all">
             <input type="file" accept=".csv,.xlsx,.xls,.json" onChange={(e) => e.target.files && setFile(e.target.files[0])} className="hidden" />
             {file ? (
-              <div className="flex flex-col items-center gap-3">
-                <BarChart2 className="text-indigo-400" />
-                <span className="text-white">{file.name}</span>
-              </div>
+              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-indigo-500/20 flex items-center justify-center">      
+                  <BarChart2 className="text-indigo-400" />
+                </div>
+                <span className="text-lg font-medium text-white">{file.name}</span>
+                <span className="text-sm text-neutral-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span>     
+              </motion.div>
             ) : (
-              <div className="flex flex-col items-center gap-3">
-                <Upload className="text-neutral-500" />
-                <span className="text-neutral-300">Sube tu archivo</span>
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Upload className="h-10 w-10 text-neutral-500 mb-2" />
+                <span className="text-lg text-neutral-300">Drop your dataset</span>
+                <span className="text-sm text-neutral-600">Supports CSV, Excel or JSON</span>
               </div>
             )}
           </label>
           {file && (
-            <div className="p-4 bg-black/20 border-t border-white/5">
+            <div className="p-4 border-t border-white/5 bg-black/20">
               {uploading ? (
-                <div className="text-center text-indigo-400 text-sm">Analizando con IA...</div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-indigo-400">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm font-medium">Analyzing with AI...</span>
+                  </div>
+                  <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500"
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 8, ease: "easeInOut" }}
+                    />
+                  </div>
+                  <p className="text-xs text-neutral-500 text-center">Generating professional insights in seconds</p>
+                </div>
               ) : (
-                <Button onClick={handleUpload} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white">Generar Análisis</Button>
+                <Button
+                  onClick={handleUpload}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl h-12 text-lg font-medium transition-all"
+                >
+                  Generate AI Analysis
+                  <ChevronRight className="ml-2 h-5 w-5" />
+                </Button>
               )}
             </div>
           )}

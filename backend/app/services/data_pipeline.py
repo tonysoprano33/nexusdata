@@ -1,4 +1,4 @@
-import os
+﻿import os
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 from app.services.chart_recommender import generate_chart_recommendations, prepare_chart_data
@@ -6,7 +6,7 @@ from app.services.advanced_analytics import run_all_advanced_analytics
 
 def read_data_file(file_path: str) -> pd.DataFrame:
     """
-    Lee CSV o Excel automáticamente según la extensión
+    Lee CSV o Excel automÃ¡ticamente segÃºn la extensiÃ³n
     """
     ext = os.path.splitext(file_path)[1].lower()
     
@@ -25,10 +25,10 @@ def read_data_file(file_path: str) -> pd.DataFrame:
 
 def process_dataset(file_path: str):
     """
-    Lee CSV/Excel/JSON, limpia datos y genera recuentos estadísticos.
+    Lee CSV/Excel/JSON, limpia datos y genera recuentos estadÃ­sticos.
     Optimizado para <10 segundos de procesamiento.
     """
-    # 1. Leer archivo automáticamente según extensión
+    # 1. Leer archivo automÃ¡ticamente segÃºn extensiÃ³n
     df = read_data_file(file_path)
     
     # Si el df es muy grande, tomamos una muestra para el inferir de forma rapida y segura.
@@ -36,7 +36,7 @@ def process_dataset(file_path: str):
     if total_rows > 100000:
         df = df.sample(100000, random_state=42)
 
-    # 2. Análisis Básico
+    # 2. AnÃ¡lisis BÃ¡sico
     columns = df.columns.tolist()
     missing_data = df.isnull().sum().to_dict()
     
@@ -50,7 +50,7 @@ def process_dataset(file_path: str):
         else:
             column_types[col] = "categorical"
             
-    # 4. Limpieza Automática (Para el analisis, rellenamos nulos)
+    # 4. Limpieza AutomÃ¡tica (Para el analisis, rellenamos nulos)
     df_clean = df.copy()
     for col in columns:
         if column_types[col] == "numeric":
@@ -61,23 +61,23 @@ def process_dataset(file_path: str):
             )
             df_clean[col] = df_clean[col].fillna(mode_value)
 
-    # 5. Calidad de datos para dashboard y priorización
+    # 5. Calidad de datos para dashboard y priorizaciÃ³n
     total_cells = max(len(df) * max(len(columns), 1), 1)
     missing_cells = int(df.isnull().sum().sum())
     completeness_ratio = 1 - (missing_cells / total_cells)
     data_quality_score = round(max(0.0, completeness_ratio) * 100, 2)
 
-    # 6. Estadísticas Descriptivas (Solo lo importante)
+    # 6. EstadÃ­sticas Descriptivas (Solo lo importante)
     numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
     stats_numeric = df_clean[numeric_cols].describe().to_dict() if numeric_cols else {}
 
-    # Matriz de Correlación
+    # Matriz de CorrelaciÃ³n
     correlation_matrix = {}
     if len(numeric_cols) > 1:
         corr = df_clean[numeric_cols].corr().fillna(0)
         correlation_matrix = corr.to_dict()
 
-    # 7. Detección rápida de anomalías en columnas numéricas
+    # 7. DetecciÃ³n rÃ¡pida de anomalÃ­as en columnas numÃ©ricas
     anomaly_summary = {"detected_rows": 0, "ratio": 0.0}
     if len(numeric_cols) >= 2 and len(df_clean) >= 20:
         numeric_frame = df_clean[numeric_cols]
@@ -109,12 +109,12 @@ def process_dataset(file_path: str):
         "sample_data": sample_data,
     }
     
-    # Generar recomendaciones de gráficos con IA
+    # Generar recomendaciones de grÃ¡ficos con IA
     try:
         chart_recommendations = generate_chart_recommendations(result, {})
         result["chart_recommendations"] = chart_recommendations
         
-        # Preparar datos para cada gráfico recomendado
+        # Preparar datos para cada grÃ¡fico recomendado
         charts_data = []
         for rec in chart_recommendations:
             chart_data = prepare_chart_data(df_clean, rec)
@@ -124,16 +124,31 @@ def process_dataset(file_path: str):
         
         result["charts_data"] = charts_data
     except Exception as e:
-        print(f"Error generando gráficos: {e}")
+        print(f"Error generando grÃ¡ficos: {e}")
         result["chart_recommendations"] = []
         result["charts_data"] = []
     
-    # Análisis avanzados automáticos
+    # AnÃ¡lisis avanzados automÃ¡ticos
     try:
         advanced_analytics = run_all_advanced_analytics(df_clean, column_types)
         result["advanced_analytics"] = advanced_analytics
     except Exception as e:
-        print(f"Error en análisis avanzados: {e}")
+        print(f"Error en anÃ¡lisis avanzados: {e}")
         result["advanced_analytics"] = {}
     
-    return result
+    
+    # Limpieza final de tipos para JSON (int64 -> int)
+    import json
+    def clean_types(obj):
+        if isinstance(obj, dict):
+            return {k: clean_types(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [clean_types(i) for i in obj]
+        elif hasattr(obj, "item"): # Para numpy types
+            return obj.item()
+        elif isinstance(obj, (float, int)) and pd.isna(obj):
+            return None
+        return obj
+    
+    return clean_types(result)
+
