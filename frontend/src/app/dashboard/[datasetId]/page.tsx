@@ -22,17 +22,20 @@ export default function DashboardPage() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Responsive sidebar handling
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024) {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) {
         setSidebarCollapsed(true);
       } else {
         setSidebarCollapsed(false);
       }
     };
-    
+
     handleResize(); // Initial check
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -43,7 +46,7 @@ export default function DashboardPage() {
 
     const fetchAnalysis = async () => {
       try {
-        const { data } = await axios.get(${API_URL}/api/datasets/);
+        const { data } = await axios.get(\/api/datasets/\);
         setAnalysis(data);
 
         if (data.status === "processing") {
@@ -63,7 +66,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#060606] text-white selection:bg-blue-500/30">
-      <div className="hidden lg:block">
+      <div className={cn("transition-all duration-300", isMobile ? "hidden" : "block")}>
         <EnterpriseSidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -72,7 +75,7 @@ export default function DashboardPage() {
 
       <TopNavbar
         sidebarCollapsed={sidebarCollapsed}
-        datasetName={result?.summary ? "Dataset Analysis" : "Loading..."}
+        datasetName={analysis?.filename || "Analysis Dashboard"}
         datasetStatus={analysis?.status || "processing"}
         onUploadClick={() => router.push("/")}
       />
@@ -80,23 +83,22 @@ export default function DashboardPage() {
       <main
         className={cn(
           "pt-24 min-h-screen transition-all duration-300 ease-in-out",
-          "lg:pl-0", // Reset on mobile
-          sidebarCollapsed ? "lg:ml-20" : "lg:ml-64"
+          isMobile ? "ml-0" : sidebarCollapsed ? "ml-20" : "ml-64"
         )}
       >
         <div className="px-4 sm:px-6 lg:px-10 py-8 max-w-[1600px] mx-auto w-full">
-          
+
           {/* Breadcrumbs / Header */}
-          {!loading && result && (
+          {!loading && (
             <div className="flex items-center gap-2 mb-8 text-neutral-500">
               <div className="p-1.5 bg-neutral-900 rounded-md border border-neutral-800">
                 <LayoutDashboard className="w-4 h-4" />
               </div>
               <ChevronRight className="w-4 h-4 opacity-30" />
-              <span className="text-sm font-medium text-neutral-300">Datasets</span>
+              <span className="text-[13px] font-medium text-neutral-400">Datasets</span>
               <ChevronRight className="w-4 h-4 opacity-30" />
-              <span className="text-sm font-bold text-white tracking-tight">
-                {datasetId}
+              <span className="text-[13px] font-bold text-white tracking-tight">
+                {analysis?.filename || datasetId}
               </span>
             </div>
           )}
@@ -133,13 +135,32 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8">
               <div className="relative">
                 <Loader2 className="w-16 h-16 text-blue-500 animate-spin" />
-                <div className="absolute inset-0 blur-2xl bg-blue-500/20 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 blur-2xl bg-blue-500/20 rounded-full animate-pulse"></div>     
               </div>
               <div className="text-center space-y-2">
                 <p className="text-2xl font-bold tracking-tight text-white">Analyzing Data</p>
                 <p className="text-neutral-400 max-w-xs mx-auto">
                   Our AI is crunching the numbers and identifying patterns. This may take a moment.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Failed */}
+          {!loading && !error && analysis?.status === "failed" && (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+              <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
+                <AlertCircle className="w-12 h-12 text-rose-500" />
+              </div>
+              <div className="text-center">
+                <h3 className="text-white font-semibold text-lg">Analysis Failed</h3>
+                <p className="text-neutral-400 text-sm">{analysis.error || "Internal processing error"}</p>
+                <Button 
+                  onClick={() => router.push("/")}
+                  className="mt-6 bg-white text-black font-bold rounded-xl"
+                >
+                  Try another dataset
+                </Button>
               </div>
             </div>
           )}
@@ -186,8 +207,8 @@ export default function DashboardPage() {
               {result.advanced_analytics && (
                 <section className="pt-8 border-t border-neutral-800/50">
                    <div className="mb-6">
-                    <h2 className="text-2xl font-bold tracking-tight text-white">Predictive Intelligence</h2>
-                    <p className="text-neutral-500 text-sm mt-1">Advanced models and statistical forecasts</p>
+                    <h2 className="text-2xl font-bold tracking-tight text-white">Predictive Intelligence</h2>   
+                    <p className="text-neutral-500 text-sm mt-1">Advanced models and statistical forecasts</p>  
                   </div>
                   <AdvancedAnalyticsPanel data={result.advanced_analytics} />
                 </section>
