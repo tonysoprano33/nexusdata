@@ -134,7 +134,7 @@ export function KpiCard({
           <div className="space-y-1">
             <h3 className="text-sm font-medium text-neutral-400">{title}</h3>
             <p className={cn(
-              "text-2xl font-bold tracking-tight",
+              "text-3xl font-bold tracking-tight",
               colors.value
             )}>
               {value}
