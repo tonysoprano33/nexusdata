@@ -4,6 +4,7 @@ import { Brain, ChevronDown, ChevronUp, Sparkles, CheckCircle2, TrendingUp, Aler
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface AIInsightsPanelProps {
   insights: string;
@@ -11,27 +12,55 @@ interface AIInsightsPanelProps {
 
 function parseInsights(text: string) {
   const sections: { title: string; items: string[] }[] = [];
-  const lines = text.split("\n").filter(l => l.trim());
+  const lines = text.split("\n");
 
   let current: { title: string; items: string[] } | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
 
+    // Detectar títulos (### o **texto**)
     if (trimmed.startsWith("###") || (trimmed.startsWith("**") && trimmed.endsWith("**"))) {
       if (current) sections.push(current);
-      const title = trimmed.replace(/^###\s*/, "").replace(/\*\*/g, "").trim();
+
+      let title = trimmed
+        .replace(/^###\s*/, "")
+        .replace(/\*\*/g, "")
+        .trim();
+
+      // Limpiar emojis comunes
+      title = title.replace(/^[🚀🧠🔍⚠️💡]\s*/, "").trim();
+
       current = { title, items: [] };
-    } else if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
-      const item = trimmed.replace(/^[-*]\s*/, "").replace(/\*\*/g, "").trim();
-      if (item && current) current.items.push(item);
-    } else if (trimmed && current) {
+      continue;
+    }
+
+    // Detectar items de lista
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      const item = trimmed.replace(/^[-*]\s*/, "").trim();
+      if (item && current) {
+        current.items.push(item);
+      }
+    } 
+    // Texto normal que pertenece a la sección actual
+    else if (trimmed && current && !trimmed.startsWith("###") && !trimmed.startsWith("**")) {
       const clean = trimmed.replace(/\*\*/g, "").trim();
-      if (clean) current.items.push(clean);
+      if (clean.length > 5) {  // evitar líneas muy cortas
+        current.items.push(clean);
+      }
     }
   }
 
   if (current) sections.push(current);
+
+  // Si no logró parsear nada, devolver todo como un solo bloque
+  if (sections.length === 0 && text.trim()) {
+    return [{
+      title: "AI Business Insights",
+      items: [text.trim()]
+    }];
+  }
+
   return sections;
 }
 
@@ -39,26 +68,34 @@ const SECTION_STYLES: Record<string, { icon: any; color: string; bg: string; bor
   default: { icon: Sparkles, color: "text-blue-400", bg: "bg-blue-500/5", border: "border-blue-500/10", accent: "bg-blue-500/20" },
   resumen: { icon: CheckCircle2, color: "text-indigo-400", bg: "bg-indigo-500/5", border: "border-indigo-500/10", accent: "bg-indigo-500/20" },   
   insight: { icon: TrendingUp, color: "text-violet-400", bg: "bg-violet-500/5", border: "border-violet-500/10", accent: "bg-violet-500/20" },    
-  patron: { icon: Brain, color: "text-cyan-400", bg: "bg-cyan-500/5", border: "border-cyan-500/10", accent: "bg-cyan-500/20" },
-  anomal: { icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/5", border: "border-amber-500/10", accent: "bg-amber-500/20" },      
-  recom: { icon: Lightbulb, color: "text-emerald-400", bg: "bg-emerald-500/5", border: "border-emerald-500/10", accent: "bg-emerald-500/20" },  
+  principal: { icon: Brain, color: "text-cyan-400", bg: "bg-cyan-500/5", border: "border-cyan-500/10", accent: "bg-cyan-500/20" },
+  riesgos: { icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/5", border: "border-amber-500/10", accent: "bg-amber-500/20" },      
+  recomendaciones: { icon: Lightbulb, color: "text-emerald-400", bg: "bg-emerald-500/5", border: "border-emerald-500/10", accent: "bg-emerald-500/20" },  
 };
 
 function getSectionStyle(title: string) {
   const t = title.toLowerCase();
-  if (t.includes("resumen")) return SECTION_STYLES.resumen;
+  if (t.includes("resumen") || t.includes("ejecutivo")) return SECTION_STYLES.resumen;
+  if (t.includes("principal") || t.includes("insight principal")) return SECTION_STYLES.principal;
   if (t.includes("insight") || t.includes("clave")) return SECTION_STYLES.insight;
-  if (t.includes("patr")) return SECTION_STYLES.patron;
-  if (t.includes("anomal") || t.includes("riesgo")) return SECTION_STYLES.anomal;
-  if (t.includes("recom")) return SECTION_STYLES.recom;
+  if (t.includes("riesgo") || t.includes("anomal")) return SECTION_STYLES.riesgos;
+  if (t.includes("recomendacion") || t.includes("recomendación")) return SECTION_STYLES.recomendaciones;
   return SECTION_STYLES.default;
 }
 
 export function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
   const [expanded, setExpanded] = useState(true);
 
-  if (!insights || insights.includes("Insight Engine Disabled") || insights.includes("Error en análisis")) {   
+  if (!insights || insights.trim() === "") {
     return null;
+  }
+
+  if (insights.includes("Error generando insights") || insights.includes("Missing GEMINI_API_KEY")) {
+    return (
+      <Card className="bg-neutral-900 border-rose-500/20 p-6">
+        <p className="text-rose-400 text-sm">{insights}</p>
+      </Card>
+    );
   }
 
   const sections = parseInsights(insights);
@@ -81,10 +118,10 @@ export function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
                 </h2>
                 <Badge variant="outline" className="bg-blue-500/5 text-blue-400 border-blue-500/20 px-2 py-0.5 text-[10px] uppercase font-bold tracking-widest flex items-center gap-1.5">
                   <Sparkles className="h-3 w-3" />
-                  Gemini Ultra
+                  Gemini
                 </Badge>
               </div>
-              <p className="text-[15px] text-neutral-400 font-medium">Executive analysis powered by neural intelligence</p>
+              <p className="text-[15px] text-neutral-400 font-medium">Análisis estratégico para toma de decisiones</p>
             </div>
           </div>
 
@@ -96,7 +133,7 @@ export function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
           </button>
         </div>
 
-        {/* Sections */}
+        {/* Content */}
         <AnimatePresence>
           {expanded && (
             <motion.div 
@@ -106,16 +143,17 @@ export function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
               transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
               className="overflow-hidden"
             >
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {sections.map((section, i) => {
                   const style = getSectionStyle(section.title);
                   const Icon = style.icon;
+
                   return (
                     <motion.div
                       key={i}
                       initial={{ y: 20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: i * 0.1 }}
+                      transition={{ delay: i * 0.08 }}
                       className={cn(
                         "rounded-2xl p-6 border transition-all duration-300 group/section",
                         style.bg,
@@ -127,21 +165,17 @@ export function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
                         <div className={cn("p-2 rounded-lg", style.accent)}>
                           <Icon className={cn("w-5 h-5", style.color)} />
                         </div>
-                        <h3 className={cn("text-lg font-bold tracking-tight uppercase text-[13px] tracking-wider opacity-90", style.color)}>
+                        <h3 className={cn("text-lg font-bold tracking-tight", style.color)}>
                           {section.title}
                         </h3>
                       </div>
                       
-                      <ul className="space-y-4">
+                      <ul className="space-y-4 text-[15px] text-neutral-200 leading-relaxed">
                         {section.items.map((item, j) => (
-                          <li key={j} className="flex items-start gap-4 group/item">
-                            <div className={cn(
-                              "mt-2 w-1.5 h-1.5 rounded-full flex-shrink-0 transition-transform group-hover/item:scale-150 duration-300", 
-                              style.color.replace("text-", "bg-")
-                            )} />
-                            <span className="text-[15px] text-neutral-200 leading-relaxed font-medium">
-                              {item}
-                            </span>
+                          <li key={j} className="flex items-start gap-3">
+                            <div className={cn("mt-2 w-1.5 h-1.5 rounded-full flex-shrink-0", 
+                              style.color.replace("text-", "bg-"))} />
+                            <span>{item}</span>
                           </li>
                         ))}
                       </ul>
