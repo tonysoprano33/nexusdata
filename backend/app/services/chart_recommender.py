@@ -60,7 +60,7 @@ def generate_chart_recommendations(data_stats: dict, sample_data: dict = None) -
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")   # Modelo correcto para 2026
+        model = genai.GenerativeModel("gemini-2.0-flash-exp")   # Modelo correcto para 2026
 
         numeric_cols = [col for col, t in data_stats.get("column_types", {}).items() if t == "numeric"]
         categorical_cols = [col for col, t in data_stats.get("column_types", {}).items() if t != "numeric"]
