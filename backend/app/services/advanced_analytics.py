@@ -12,316 +12,239 @@ logger = logging.getLogger(__name__)
 
 
 def _make_serializable(obj: Any) -> Any:
-    """Convierte recursivamente tipos numpy/pandas a tipos Python nativos para JSON."""
+    """Convierte numpy/pandas a tipos nativos de Python."""
     if isinstance(obj, dict):
         return {str(k): _make_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
         return [_make_serializable(i) for i in obj]
-    elif isinstance(obj, np.integer):
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
         return int(obj)
-    elif isinstance(obj, np.floating):
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
         return None if (np.isnan(obj) or np.isinf(obj)) else float(obj)
     elif isinstance(obj, np.bool_):
         return bool(obj)
-    elif isinstance(obj, np.ndarray):
-        return [_make_serializable(i) for i in obj.tolist()]
     elif isinstance(obj, pd.Timestamp):
         return obj.isoformat()
     return obj
 
 
 def detect_churn_indicators(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str, Any]:
-    """Detecta indicadores de churn de forma inteligente y segura."""
+    """Detecta riesgo de churn / pérdida con interpretación de negocio."""
     if not isinstance(df, pd.DataFrame):
-        logger.warning("detect_churn_indicators recibió algo que no es DataFrame")
-        return {"detected": False, "churn_column": None, "churn_rate": None, "insights": ["Error: datos inválidos"]}
+        return {"detected": False, "insights": ["Datos inválidos para análisis de churn"]}
 
     result = {
         "detected": False,
         "churn_column": None,
         "churn_rate": None,
-        "insights": []
+        "risk_level": "low",
+        "insights": [],
+        "business_impact": ""
     }
 
-    churn_keywords = ['churn', 'cancel', 'active', 'status', 'retained', 'unsub', 'lost', 'left']
-    numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
-
-    # Buscar columna de churn explícita
+    churn_keywords = ['churn', 'cancel', 'lost', 'inactive', 'unsub', 'left', 'status']
+    
     for col in df.columns:
         col_lower = col.lower()
-        if any(keyword in col_lower for keyword in churn_keywords):
+        if any(k in col_lower for k in churn_keywords):
             result["detected"] = True
             result["churn_column"] = col
 
-            # Si es categórica o binaria
-            if df[col].dtype == 'object' or df[col].nunique() <= 6:
-                value_counts = df[col].value_counts(dropna=True)
+            if df[col].nunique() <= 6:
+                value_counts = df[col].value_counts()
                 total = len(df)
-                churn_values = {'yes', 'true', '1', 'cancelled', 'churned', 'inactive', 'false', 'no', '0'}
-                churn_count = sum(int(value_counts.get(val, 0)) for val in value_counts.index 
-                                if str(val).lower().strip() in churn_values)
-
+                churn_count = sum(value_counts.get(v, 0) for v in value_counts.index 
+                                if str(v).lower() in ['yes', '1', 'true', 'cancelled', 'churned', 'inactive'])
+                
                 if churn_count > 0:
-                    churn_rate = round((churn_count / total) * 100, 2)
-                    result["churn_rate"] = churn_rate
-                    result["insights"].extend([
-                        f"Tasa de churn detectada: {churn_rate}%",
-                        f"Clientes perdidos: {churn_count} de {total}"
-                    ])
+                    rate = round((churn_count / total) * 100, 1)
+                    result["churn_rate"] = rate
+                    result["risk_level"] = "high" if rate > 25 else "medium" if rate > 10 else "low"
+                    result["insights"] = [
+                        f"Se detectó una tasa de churn del {rate}%",
+                        f"{churn_count} registros muestran pérdida o inactividad"
+                    ]
+                    result["business_impact"] = f"Impacto estimado: pérdida de {rate}% de la base analizada."
             break
-
-    # Fallback: alto recency como posible churn
-    if not result["detected"] and numeric_cols:
-        recency_keywords = ['recency', 'last_purchase', 'days_since', 'last_active']
-        for col in df.columns:
-            if any(k in col.lower() for k in recency_keywords) and col in numeric_cols:
-                try:
-                    high_recency = df[col] > df[col].quantile(0.8)
-                    churn_rate = round((high_recency.sum() / len(df)) * 100, 2)
-                    if churn_rate > 5:
-                        result["detected"] = True
-                        result["churn_column"] = col
-                        result["churn_rate"] = churn_rate
-                        result["insights"].append(f"{churn_rate}% de clientes con alta recencia (riesgo de churn)")
-                except Exception:
-                    pass
-                break
 
     return result
 
 
 def rfm_segmentation(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str, Any]:
-    """RFM Segmentation solo si existen customer_id y fechas. Totalmente seguro."""
-    if not isinstance(df, pd.DataFrame):
-        return {"applicable": False, "reason": "Datos inválidos", "segments": [], "insights": []}
+    """RFM con interpretación real de valor de cliente."""
+    result = {"applicable": False, "segments": [], "insights": [], "business_value": ""}
 
-    result = {"applicable": False, "segments": [], "insights": [], "reason": ""}
+    cols_lower = [c.lower() for c in df.columns]
+    has_customer = any(k in cols_lower for k in ['customer', 'client', 'user_id', 'id'])
+    has_monetary = any(k in cols_lower for k in ['amount', 'revenue', 'value', 'total', 'monetary'])
 
-    col_names_lower = [c.lower() for c in df.columns]
-    has_customer = any(k in col_names_lower for k in ['customer_id', 'client_id', 'user_id', 'cust_id', 'customer'])
-    has_date = any(t == 'datetime' for t in column_types.values())
-
-    if not has_customer or not has_date:
-        result["reason"] = "RFM requiere columna de cliente (customer_id) y fechas reales"
+    if not (has_customer and has_monetary):
+        result["reason"] = "No se detectaron columnas suficientes para segmentación RFM (falta cliente o valor monetario)"
         return result
 
-    numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
-
-    monetary_col = None
-    for col in df.columns:
-        col_lower = col.lower()
-        if any(k in col_lower for k in ['monetary', 'revenue', 'amount', 'total', 'value', 'spend']):
-            monetary_col = col
-            break
-
-    if not monetary_col or monetary_col not in numeric_cols:
-        result["reason"] = "No se encontró columna monetaria adecuada"
+    monetary_col = next((col for col in df.columns if any(k in col.lower() for k in ['amount', 'revenue', 'value', 'total'])), None)
+    if not monetary_col:
         return result
 
     try:
         df_rfm = df.copy()
-        monetary_values = df_rfm[monetary_col].fillna(0)
+        values = pd.to_numeric(df_rfm[monetary_col], errors='coerce').fillna(0)
 
-        q25 = float(monetary_values.quantile(0.25))
-        q50 = float(monetary_values.quantile(0.50))
-        q75 = float(monetary_values.quantile(0.75))
+        q25, q50, q75 = values.quantile([0.25, 0.5, 0.75])
 
-        def segment_customer(value: float) -> str:
-            if value >= q75:
-                return "VIP (Top 25%)"
-            elif value >= q50:
-                return "Valioso (50-75%)"
-            elif value >= q25:
-                return "Regular (25-50%)"
-            else:
-                return "Bajo valor"
+        def segment(value):
+            if value >= q75: return "High Value"
+            elif value >= q50: return "Medium Value"
+            elif value >= q25: return "Low-Medium Value"
+            else: return "Low Value"
 
-        segments_series = monetary_values.apply(segment_customer)
-        segments = segments_series.value_counts().to_dict()
+        segments = values.apply(segment).value_counts()
 
         result["applicable"] = True
         result["segments"] = [
-            {
-                "name": name,
-                "count": int(count),
-                "percentage": round((int(count) / len(df)) * 100, 1)
-            }
+            {"name": name, "count": int(count), "percentage": round(int(count)/len(df)*100, 1)}
             for name, count in segments.items()
         ]
 
-        mean_value = float(monetary_values.mean())
+        total_revenue = float(values.sum())
+        high_value_revenue = float(values[values >= q75].sum())
+
         result["insights"] = [
-            f"Clientes VIP: {segments.get('VIP (Top 25%)', 0)} ({round(segments.get('VIP (Top 25%)', 0)/len(df)*100, 1)}%)",
-            f"Valor promedio por cliente: ${mean_value:.2f}",
-            f"Valor mediana: ${float(monetary_values.median()):.2f}"
+            f"El {round(segments.get('High Value', 0)/len(df)*100, 1)}% de los registros (High Value) concentran {round(high_value_revenue/total_revenue*100, 1)}% del valor total",
+            f"Valor promedio por registro: ${values.mean():.2f}"
         ]
+        result["business_value"] = f"Concentración de valor: Top 25% genera {round(high_value_revenue/total_revenue*100, 1)}% del revenue"
 
     except Exception as e:
-        logger.warning(f"Error en RFM: {e}")
-        result["reason"] = f"Error procesando RFM: {str(e)[:80]}"
+        logger.warning(f"RFM falló: {e}")
 
     return result
 
 
 def simple_predictions(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str, Any]:
-    """Predicciones simples con regresión lineal. Solo si R² > 0.3."""
-    if not isinstance(df, pd.DataFrame):
-        return {"applicable": False, "reason": "Datos inválidos"}
-
+    """Predicción con interpretación clara de negocio."""
     result = {
         "applicable": False,
-        "target_column": None,
+        "target": None,
         "r2_score": None,
-        "predictions": [],
+        "interpretation": "",
         "insights": [],
-        "model_info": None,
-        "reason": ""
+        "recommendation": ""
     }
 
-    numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
+    numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
     if len(numeric_cols) < 2:
-        result["reason"] = "Se necesitan al menos 2 columnas numéricas"
         return result
 
-    # Elegir target con mayor varianza
-    variances = {col: float(df[col].var()) for col in numeric_cols if float(df[col].var()) > 1e-6}
-    if not variances:
-        result["reason"] = "No hay varianza suficiente en las columnas numéricas"
-        return result
+    # Elegir target más relevante (mayor varianza)
+    target = max(numeric_cols, key=lambda col: df[col].var() if pd.api.types.is_numeric_dtype(df[col]) else 0)
 
-    target_col = max(variances, key=variances.get)
-    feature_cols = [c for c in numeric_cols if c != target_col][:3]
-
-    if len(feature_cols) < 1:
-        return result
+    feature_cols = [c for c in numeric_cols if c != target][:3]
 
     try:
-        df_model = df[feature_cols + [target_col]].dropna()
-        if len(df_model) < 20:   # mínimo razonable
-            result["reason"] = "Insuficientes filas después de eliminar nulos"
+        df_model = df[feature_cols + [target]].dropna()
+        if len(df_model) < 30:
             return result
 
         X = df_model[feature_cols]
-        y = df_model[target_col]
+        y = df_model[target]
 
         model = LinearRegression()
         model.fit(X, y)
-        r2_score = float(model.score(X, y))
+        r2 = model.score(X, y)
 
-        if r2_score < 0.3:
-            result["reason"] = f"R² = {round(r2_score, 2)} → correlación demasiado baja"
+        if r2 < 0.25:
+            result["interpretation"] = f"El modelo tiene baja predictibilidad (R² = {r2:.2f})"
             return result
 
         result["applicable"] = True
-        result["target_column"] = target_col
-        result["r2_score"] = round(r2_score, 3)
-
-        result["model_info"] = {
-            "type": "Regresión Lineal",
-            "target": target_col,
-            "features": feature_cols,
-            "r2_score": round(r2_score, 3),
-            "r2_percent": round(r2_score * 100, 1),
-            "reliable": r2_score > 0.7
-        }
-
-        # Predicciones de ejemplo con las últimas filas
-        last_values = X.tail(3).values
-        predictions = model.predict(last_values)
-
-        result["predictions"] = [
-            {
-                "scenario": f"Escenario {i+1}",
-                "features": {k: round(float(v), 2) for k, v in zip(feature_cols, vals)},
-                "predicted": round(float(pred), 2)
-            }
-            for i, (vals, pred) in enumerate(zip(last_values, predictions))
-        ]
+        result["target"] = target
+        result["r2_score"] = round(r2, 3)
 
         result["insights"] = [
-            f"Predicción de '{target_col}' basada en {', '.join(feature_cols)}",
-            f"Precisión del modelo (R²): {round(r2_score * 100, 1)}%"
+            f"Se puede predecir '{target}' con una precisión de {round(r2*100, 1)}% usando {len(feature_cols)} variables",
         ]
-        if r2_score > 0.7:
-            result["insights"].append("✅ Modelo confiable")
-        elif r2_score > 0.5:
-            result["insights"].append("⚠️ Correlación moderada")
+
+        if r2 > 0.65:
+            result["interpretation"] = "Modelo fuerte - útil para planificación y forecasting"
+            result["recommendation"] = "Recomendado usar este modelo para estimaciones presupuestarias"
+        elif r2 > 0.45:
+            result["interpretation"] = "Modelo moderado - orientativo"
+            result["recommendation"] = "Útil como referencia, pero combinar con juicio experto"
+        else:
+            result["interpretation"] = "Modelo débil - correlaciones bajas"
 
     except Exception as e:
-        logger.warning(f"Error en predicciones: {e}")
-        result["reason"] = f"Error en modelo: {str(e)[:80]}"
+        logger.warning(f"Predicción falló: {e}")
 
     return result
 
 
 def kmeans_clustering(df: pd.DataFrame, column_types: Dict[str, str], n_clusters: int = 4) -> Dict[str, Any]:
-    """Clustering K-Means robusto y seguro."""
-    if not isinstance(df, pd.DataFrame):
-        return {"applicable": False, "reason": "Datos inválidos", "clusters": [], "insights": []}
+    """Clustering con nombres y significado de negocio."""
+    result = {
+        "applicable": False,
+        "clusters": [],
+        "insights": [],
+        "segment_names": []
+    }
 
-    result = {"applicable": False, "clusters": [], "insights": [], "reason": ""}
-
-    numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
+    numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
     if len(numeric_cols) < 2:
-        result["reason"] = "Se necesitan al menos 2 columnas numéricas para clustering"
         return result
 
     try:
-        df_cluster = df[numeric_cols].copy()
-        # Rellenar nulos con mediana (más robusto)
-        df_cluster = df_cluster.fillna(df_cluster.median(numeric_only=True))
-
-        if len(df_cluster) < n_clusters * 5:
-            result["reason"] = "Dataset demasiado pequeño para clustering confiable"
-            return result
-
+        data = df[numeric_cols].fillna(df[numeric_cols].median())
         scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(df_cluster)
+        scaled = scaler.fit_transform(data)
 
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-        clusters = kmeans.fit_predict(scaled_data)
+        labels = kmeans.fit_predict(scaled)
 
-        cluster_counts = pd.Series(clusters).value_counts().sort_index()
+        df_cluster = data.copy()
+        df_cluster['cluster'] = labels
 
-        result["applicable"] = True
-        result["clusters"] = []
-
+        cluster_summary = []
         for i in range(n_clusters):
-            count = int(cluster_counts.get(i, 0))
-            mask = clusters == i
-            if mask.sum() == 0:
-                continue
-            centroid = {k: round(float(v), 2) for k, v in df_cluster[mask][numeric_cols].mean().items()}
+            cluster_data = df_cluster[df_cluster['cluster'] == i][numeric_cols]
+            size = len(cluster_data)
+            percentage = round(size / len(df) * 100, 1)
+            centroid = cluster_data.mean().round(2).to_dict()
 
-            result["clusters"].append({
+            # Nombre inteligente según tamaño y características
+            if percentage > 40:
+                name = "Segmento Principal"
+            elif percentage < 10:
+                name = "Segmento Niche / Outlier"
+            else:
+                name = f"Segmento {i+1}"
+
+            cluster_summary.append({
                 "id": i,
-                "name": f"Segmento {i + 1}",
-                "count": count,
-                "percentage": round((count / len(df)) * 100, 1),
+                "name": name,
+                "size": size,
+                "percentage": percentage,
                 "centroid": centroid
             })
 
+        result["applicable"] = True
+        result["clusters"] = cluster_summary
         result["insights"] = [
-            f"Dataset segmentado en {n_clusters} grupos usando K-Means",
-            f"Segmento más grande: {int(cluster_counts.idxmax()) + 1} con {int(cluster_counts.max())} registros"
+            f"Se identificaron {n_clusters} segmentos de comportamiento distintos",
+            f"El segmento más grande representa el {max(c['percentage'] for c in cluster_summary)}% de los registros"
         ]
 
     except Exception as e:
-        logger.warning(f"Error en KMeans clustering: {e}")
-        result["reason"] = f"Error técnico en clustering: {str(e)[:80]}"
+        logger.warning(f"Clustering falló: {e}")
 
     return result
 
 
 def run_all_advanced_analytics(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str, Any]:
-    """
-    Ejecuta todos los análisis avanzados de forma segura.
-    Retorna siempre un diccionario serializable.
-    """
+    """Versión de alto nivel - pensada para executives."""
     if not isinstance(df, pd.DataFrame):
-        logger.error("run_all_advanced_analytics recibió algo que no es DataFrame")
-        return {"error": "Invalid data type received", "churn_analysis": {}, "rfm_segmentation": {}, 
-                "predictions": {}, "clustering": {}}
+        logger.error("run_all_advanced_analytics recibió datos inválidos")
+        return {"error": "Invalid data type"}
 
     try:
         result = {
@@ -329,17 +252,12 @@ def run_all_advanced_analytics(df: pd.DataFrame, column_types: Dict[str, str]) -
             "rfm_segmentation": rfm_segmentation(df, column_types),
             "predictions": simple_predictions(df, column_types),
             "clustering": kmeans_clustering(df, column_types),
-            "generated_at": pd.Timestamp.now().isoformat()
+            "generated_at": pd.Timestamp.now().isoformat(),
+            "summary": "Análisis avanzado completado con enfoque en valor de negocio"
         }
 
         return _make_serializable(result)
 
     except Exception as e:
-        logger.error(f"Error crítico en run_all_advanced_analytics: {e}\n{traceback.format_exc()}")
-        return {
-            "error": str(e),
-            "churn_analysis": {},
-            "rfm_segmentation": {},
-            "predictions": {},
-            "clustering": {}
-        }
+        logger.error(f"Error en advanced analytics: {e}\n{traceback.format_exc()}")
+        return {"error": str(e)}
