@@ -142,8 +142,25 @@ async def get_analysis(file_id: str, db: Session = Depends(get_db)):
         "id": analysis.id,
         "status": analysis.status,
         "result": analysis.analysis_result,
-        "error": analysis.error
+        "error": analysis.error,
+        "filename": analysis.filename
     }
+
+
+@router.delete("/{file_id}")
+async def delete_analysis(file_id: str, db: Session = Depends(get_db)):
+    analysis = db.get(DatasetAnalysis, file_id)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found.")
+
+    try:
+        db.delete(analysis)
+        db.commit()
+        logger.info(f"Deleted dataset: {file_id}")
+        return {"message": "Dataset deleted successfully", "id": file_id}
+    except Exception as e:
+        logger.error(f"Delete error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete dataset")
 
 
 def run_analysis_pipeline(file_id: str, file_path: str):
@@ -166,7 +183,7 @@ def run_analysis_pipeline(file_id: str, file_path: str):
 
         logger.info(f"Dataset processed successfully. Shape: {result.get('summary', {}).get('total_rows')} rows")
 
-        # 2. Generar insights de negocio (versión mejorada)
+        # 2. Generar insights de negocio
         insights = generate_business_insights(result)
         result["business_insights"] = insights
 

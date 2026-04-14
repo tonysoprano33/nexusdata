@@ -1,7 +1,7 @@
 ﻿"use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Search, Loader2, CheckCircle2, XCircle, FileSpreadsheet, BarChart3, Sparkles, Filter, LayoutGrid, List } from "lucide-react";
+import { Clock, Search, Loader2, CheckCircle2, XCircle, FileSpreadsheet, BarChart3, Sparkles, Filter, LayoutGrid, List, Trash2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,23 +23,36 @@ export function AnalysisHistory({ hideHeader = false }: AnalysisHistoryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const params = new URLSearchParams();
-        params.set("limit", "24");
-        if (historyStatusFilter !== "all") params.set("status", historyStatusFilter);
-        const { data } = await axios.get(`${API_URL}/api/datasets/?` + params.toString());
-        setHistory(data);
-      } catch (error) {
-        console.error("Error loading history", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchHistory = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "24");
+      if (historyStatusFilter !== "all") params.set("status", historyStatusFilter);
+      const { data } = await axios.get(`${API_URL}/api/datasets/?` + params.toString());
+      setHistory(data);
+    } catch (error) {
+      console.error("Error loading history", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchHistory();
   }, [historyStatusFilter]);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm("¿Estás seguro de que quieres eliminar este dataset?")) return;
+    
+    try {
+      await axios.delete(`${API_URL}/api/datasets/${id}`);
+      setHistory(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error("Error deleting dataset", error);
+      alert("No se pudo eliminar el dataset.");
+    }
+  };
 
   const filteredHistory = useMemo(() => {
     let result = history;
@@ -87,7 +100,7 @@ export function AnalysisHistory({ hideHeader = false }: AnalysisHistoryProps) {
         </div>
       )}
 
-      {/* Search Bar - only if header is hidden (means we are in Management page) */}
+      {/* Search Bar */}
       {hideHeader && (
         <div className="relative mb-8 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 group-focus-within:text-blue-400 transition-colors" />
@@ -132,6 +145,7 @@ export function AnalysisHistory({ hideHeader = false }: AnalysisHistoryProps) {
                 item={item}
                 index={index}
                 onClick={() => router.push(`/dashboard/${item.id}`)}
+                onDelete={(e) => handleDelete(e, item.id)}
               />
             ))
           )}
@@ -141,7 +155,7 @@ export function AnalysisHistory({ hideHeader = false }: AnalysisHistoryProps) {
   );
 }
 
-function AnalysisCard({ item, index, onClick }: { item: AnalysisHistoryType; index: number; onClick: () => void }) {
+function AnalysisCard({ item, index, onClick, onDelete }: { item: AnalysisHistoryType; index: number; onClick: () => void; onDelete: (e: React.MouseEvent) => void }) {
   const statusConfig = {
     processing: { icon: Loader2, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", label: "Analizing", spin: true },
     completed: { icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", label: "Ready", spin: false },
@@ -156,6 +170,7 @@ function AnalysisCard({ item, index, onClick }: { item: AnalysisHistoryType; ind
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ delay: index * 0.04 }}
+      layout
     >
       <Card
         className="group bg-[#0f0f0f] border-neutral-800/60 hover:border-blue-500/40 transition-all cursor-pointer overflow-hidden relative shadow-xl rounded-3xl"
@@ -205,7 +220,16 @@ function AnalysisCard({ item, index, onClick }: { item: AnalysisHistoryType; ind
             </div>
           )}
 
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex items-center justify-between">
+             <Button
+                variant="ghost"
+                size="icon"
+                onClick={onDelete}
+                className="h-9 w-9 rounded-xl text-neutral-600 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
+             >
+                <Trash2 className="w-4.5 h-4.5" />
+             </Button>
+             
              <div className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center group-hover:bg-blue-600 group-hover:border-blue-500 transition-all">
                 <ArrowRight className="w-4 h-4 text-neutral-600 group-hover:text-white" />
              </div>
