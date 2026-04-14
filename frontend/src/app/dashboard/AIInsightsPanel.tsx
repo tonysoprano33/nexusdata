@@ -18,7 +18,7 @@ function parseInsights(text: string) {
 
   for (const line of lines) {
     const trimmed = line.trim();
-
+    // Prueba
     // Detectar títulos (### o **texto**)
     if (trimmed.startsWith("###") || (trimmed.startsWith("**") && trimmed.endsWith("**"))) {
       if (current) sections.push(current);
@@ -190,3 +190,4 @@ export function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
     </Card>
   );
 }
+console.log("la wea")
