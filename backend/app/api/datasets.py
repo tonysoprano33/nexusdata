@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 
 from app.db.database import DatasetAnalysis, SessionLocal, get_db
 from app.services.data_pipeline import process_dataset
-# CORRECCIÓN: Importamos la función con su nombre real y usamos alias
 from app.services.agent_reasoning import generate_insights as generate_business_insights
 from app.services.pdf_generator import generate_pdf_report
 from app.services.pptx_generator import generate_pptx_report
@@ -32,7 +31,7 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
 def make_json_serializable(obj):
-    """Recursivamente convierte tipos numpy/pandas a tipos Python serializables por JSON."""
+    """Convierte recursivamente tipos numpy/pandas a tipos Python nativos serializables por JSON."""
     if obj is None:
         return None
     if isinstance(obj, dict):
@@ -66,6 +65,7 @@ async def list_analyses(
             query = query.filter(DatasetAnalysis.status == status)
 
         records = query.order_by(desc(DatasetAnalysis.created_at)).limit(limit).all()
+
         return [
             {
                 "id": row.id,
@@ -74,8 +74,7 @@ async def list_analyses(
                 "created_at": row.created_at.isoformat() if row.created_at else None,
                 "data_quality_score": (
                     row.analysis_result.get("summary", {}).get("data_quality_score")
-                    if row.analysis_result
-                    else None
+                    if row.analysis_result else None
                 ),
                 "summary": row.analysis_result.get("summary") if row.analysis_result else None
             }
@@ -97,7 +96,7 @@ async def upload_dataset(
     if not any(file.filename.endswith(ext) for ext in valid_extensions):
         raise HTTPException(status_code=400, detail="Unsupported file format.")
 
-    # Leer y validar tamaño antes de escribir al disco
+    # Leer y validar tamaño
     content = await file.read()
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
@@ -112,10 +111,13 @@ async def upload_dataset(
         with open(file_path, "wb") as buffer:
             buffer.write(content)
 
+        # Guardar registro inicial
         db.add(DatasetAnalysis(id=file_id, filename=file.filename, status="processing"))
         db.commit()
 
         logger.info(f"Dataset uploaded: {file_id} ({file.filename})")
+
+        # Procesar en background
         background_tasks.add_task(run_analysis_pipeline, file_id, file_path)
 
         return {
@@ -145,34 +147,40 @@ async def get_analysis(file_id: str, db: Session = Depends(get_db)):
 
 
 def run_analysis_pipeline(file_id: str, file_path: str):
-    """Corre en background — maneja su propia sesión de DB."""
+    """Pipeline principal de análisis - se ejecuta en background."""
     db = SessionLocal()
     analysis = None
+
     try:
         analysis = db.get(DatasetAnalysis, file_id)
         if not analysis:
             logger.error(f"Analysis record not found for {file_id}")
             return
 
-        logger.info(f"Starting pipeline for {file_id}")
+        logger.info(f"Starting analysis pipeline for {file_id}")
+
+        # 1. Procesar el dataset
         result = process_dataset(file_path)
-        logger.info(f"Process result type: {type(result)}")
-
         if result is None:
-            raise ValueError("process_dataset devolvió None — revisar data_pipeline.py")
+            raise ValueError("process_dataset returned None")
 
-        # Generación de insights de negocio usando la función correcta
+        logger.info(f"Dataset processed successfully. Shape: {result.get('summary', {}).get('total_rows')} rows")
+
+        # 2. Generar insights de negocio (versión mejorada)
         insights = generate_business_insights(result)
         result["business_insights"] = insights
 
+        # 3. Guardar resultado
         analysis.status = "completed"
         analysis.analysis_result = make_json_serializable(result)
         analysis.error = None
+
         db.commit()
-        logger.info(f"Pipeline completed for {file_id}")
+        logger.info(f"✅ Pipeline completed successfully for {file_id}")
 
     except Exception as e:
-        logger.error(f"Pipeline failed for {file_id}: {e}")
+        logger.error(f"❌ Pipeline failed for {file_id}: {e}", exc_info=True)
+
         if analysis:
             analysis.status = "failed"
             analysis.error = str(e)
@@ -185,44 +193,49 @@ def run_analysis_pipeline(file_id: str, file_path: str):
                     analysis.error = str(e)
                     db.commit()
             except Exception as inner_e:
-                logger.error(f"Could not update failed status for {file_id}: {inner_e}")
+                logger.error(f"Could not update failed status: {inner_e}")
+
     finally:
         db.close()
         if os.path.exists(file_path):
             os.remove(file_path)
-            logger.info(f"Cleaned up file: {file_path}")
+            logger.info(f"Cleaned up temporary file: {file_path}")
 
 
 @router.get("/{file_id}/export/{format}")
 async def export_report(file_id: str, format: str, db: Session = Depends(get_db)):
     analysis = db.get(DatasetAnalysis, file_id)
     if not analysis or analysis.status != "completed":
-        raise HTTPException(status_code=404, detail="Ready analysis not found")
+        raise HTTPException(status_code=404, detail="Analysis not ready or not found")
 
-    if format == "pdf":
-        report_bytes = generate_pdf_report({"result": analysis.analysis_result})
-        media_type = "application/pdf"
-    elif format == "pptx":
-        report_bytes = generate_pptx_report({"result": analysis.analysis_result})
-        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    else:
-        raise HTTPException(status_code=400, detail="Invalid format. Use 'pdf' or 'pptx'.")
+    try:
+        if format == "pdf":
+            report_bytes = generate_pdf_report({"result": analysis.analysis_result})
+            media_type = "application/pdf"
+        elif format == "pptx":
+            report_bytes = generate_pptx_report({"result": analysis.analysis_result})
+            media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid format. Use 'pdf' or 'pptx'.")
 
-    if not report_bytes:
+        if not report_bytes:
+            raise HTTPException(status_code=500, detail=f"Failed to generate {format} report")
+
+        return Response(
+            content=report_bytes,
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename=report_{file_id[:8]}.{format}"}
+        )
+    except Exception as e:
+        logger.error(f"Export error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate {format} report")
-
-    return Response(
-        content=report_bytes,
-        media_type=media_type,
-        headers={"Content-Disposition": f"attachment; filename=report_{file_id[:8]}.{format}"}
-    )
 
 
 @router.post("/{file_id}/chat")
 async def chat_dataset(file_id: str, question: str, db: Session = Depends(get_db)):
     analysis = db.get(DatasetAnalysis, file_id)
     if not analysis or analysis.status != "completed":
-        raise HTTPException(status_code=404, detail="Ready analysis not found")
+        raise HTTPException(status_code=404, detail="Analysis not ready")
 
     result = analysis.analysis_result or {}
     sample_data = result.get("sample_data", [])

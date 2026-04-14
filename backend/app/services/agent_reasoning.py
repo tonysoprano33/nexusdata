@@ -1,207 +1,108 @@
 ﻿import os
 import json
-import numpy as np
-import pandas as pd
+import logging
+from typing import Dict, Any
+
 import google.generativeai as genai
+import pandas as pd
 
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import accuracy_score, r2_score
-from sklearn.preprocessing import LabelEncoder
+logger = logging.getLogger(__name__)
 
 
-# =========================================
-# 🧠 DETECCIÓN DE TARGET INTELIGENTE
-# =========================================
-
-def detect_target(df: pd.DataFrame):
-    # Prioridad: columnas tipo churn / target / label
-    for col in df.columns:
-        if col.lower() in ["churn", "target", "label", "outcome"]:
-            return col
-
-    # Si hay booleanos/binarios
-    for col in df.columns:
-        if df[col].nunique() == 2:
-            return col
-
-    return None
-
-
-# =========================================
-# 🧠 PREPROCESAMIENTO
-# =========================================
-
-def encode_dataframe(df: pd.DataFrame):
-    df_encoded = df.copy()
-    encoders = {}
-
-    for col in df_encoded.select_dtypes(include=['object']).columns:
-        le = LabelEncoder()
-        df_encoded[col] = le.fit_transform(df_encoded[col].astype(str))
-        encoders[col] = le
-
-    return df_encoded, encoders
-
-
-def get_top_correlations(df: pd.DataFrame, top_n=3):
-    corr = df.corr(numeric_only=True)
-    pairs = []
-
-    for col1 in corr.columns:
-        for col2 in corr.columns:
-            if col1 != col2:
-                pairs.append((col1, col2, corr.loc[col1, col2]))
-
-    pairs = sorted(pairs, key=lambda x: abs(x[2]), reverse=True)
-
-    seen = set()
-    result = []
-    for a, b, v in pairs:
-        key = tuple(sorted([a, b]))
-        if key not in seen:
-            seen.add(key)
-            result.append((a, b, round(v, 3)))
-        if len(result) >= top_n:
-            break
-
-    return result
-
-
-# =========================================
-# 🤖 ML AUTOMÁTICO
-# =========================================
-
-def run_ml(df: pd.DataFrame, target_col: str):
-    try:
-        df_encoded, _ = encode_dataframe(df)
-
-        X = df_encoded.drop(columns=[target_col])
-        y = df_encoded[target_col]
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-
-        # Clasificación
-        if y.nunique() <= 10:
-            model = LogisticRegression(max_iter=1000)
-            model.fit(X_train, y_train)
-            preds = model.predict(X_test)
-
-            return {
-                "type": "classification",
-                "score": round(accuracy_score(y_test, preds), 3)
-            }
-
-        # Regresión
-        else:
-            model = LinearRegression()
-            model.fit(X_train, y_train)
-            preds = model.predict(X_test)
-
-            return {
-                "type": "regression",
-                "score": round(r2_score(y_test, preds), 3)
-            }
-
-    except Exception:
-        return None
-
-
-# =========================================
-# 🧠 GENERADOR DE INSIGHTS (CORE)
-# =========================================
-
-def generate_insights(data) -> str:
+def generate_insights(data: Dict[str, Any]) -> str:
     """
-    Acepta un pd.DataFrame o un dict (resultado de process_dataset)
+    Genera insights de negocio potentes y accionables usando Gemini.
+    Versión optimizada para entregar valor real al CEO.
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        return "Missing GEMINI_API_KEY"
+        return "❌ Error: GEMINI_API_KEY no configurada en el entorno."
 
-    # Si es un dict, extraemos métricas básicas del dict para evitar errores de .isna()
-    if isinstance(data, dict):
-        summary = data.get("summary", {})
-        total_rows = summary.get("total_rows", 0)
-        missing = summary.get("missing_cells", 0)
-        column_types = data.get("column_types", {})
-        numeric_cols = [c for c, t in column_types.items() if t == "numeric"]
-        categorical_cols = [c for c, t in column_types.items() if t != "numeric"]
-        
-        # En modo dict usamos lo que ya calculó el data_pipeline
-        correlations = data.get("correlation_matrix", {})
-        ml_result = "Basado en el análisis estadístico del dataset"
-        target = "Análisis Global"
-    else:
-        # Si es un DataFrame, procedemos con el análisis profundo
-        df = data
-        total_rows = len(df)
-        missing = int(df.isna().sum().sum())
-        numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
-        categorical_cols = df.select_dtypes(exclude=np.number).columns.tolist()
-        target = detect_target(df)
-        correlations = get_top_correlations(df)
-        ml_result = run_ml(df, target) if target else None
+    # Extraer toda la información rica del pipeline
+    summary = data.get("summary", {})
+    column_types = data.get("column_types", {})
+    descriptive_stats = data.get("descriptive_statistics", {})
+    correlations = data.get("correlation_matrix", {})
+    anomalies = data.get("anomaly_detection", {})
+    advanced = data.get("advanced_analytics", {})
+    charts = data.get("charts_data", [])
+    sample_data = data.get("sample_data", [])
 
-    genai.configure(api_key=api_key)
-    # Usamos gemini-2.0-flash que es el estándar actual estable
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    total_rows = summary.get("total_rows", 0)
+    data_quality = summary.get("data_quality_score", 0)
+    missing_cells = summary.get("missing_cells", 0)
 
-    # =========================
-    # 🧠 PROMPT FINAL PRO
-    # =========================
+    # Preparar información clave para el prompt
+    numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
+    categorical_cols = [col for col, t in column_types.items() if t != "numeric"]
+
+    churn_info = advanced.get("churn_analysis", {})
+    rfm_info = advanced.get("rfm_segmentation", {})
+    predictions = advanced.get("predictions", {})
+    clustering = advanced.get("clustering", {})
 
     prompt = f"""
-Actúa como un Data Analyst senior orientado a negocio.
+Eres un **Data Analyst Senior** con más de 10 años de experiencia, especializado en generar insights accionables para CEOs y gerentes.
 
-NO describas datos. Genera decisiones.
+Analiza este dataset y genera un análisis de alto nivel estratégico. 
 
-====================
-📊 DATASET
-====================
-- Filas: {total_rows}
-- Missing: {missing}
-- Numéricas: {numeric_cols[:6]}
-- Categóricas: {categorical_cols[:6]}
-- Enfoque: {target}
+### Información del Dataset:
+- Filas totales: {total_rows}
+- Calidad de datos: {data_quality}%
+- Celdas faltantes: {missing_cells}
+- Columnas numéricas: {numeric_cols[:8]}
+- Columnas categóricas: {categorical_cols[:6]}
 
-- Correlaciones/Patrones: {correlations}
+### Análisis Avanzado Disponible:
+- Detección de Churn: {json.dumps(churn_info, indent=2) if churn_info else "No detectado"}
+- Segmentación RFM: {json.dumps(rfm_info, indent=2) if rfm_info.get("applicable") else "No aplica"}
+- Predicciones: {json.dumps(predictions, indent=2) if predictions.get("applicable") else "No aplicable"}
+- Clustering: {json.dumps(clustering, indent=2) if clustering.get("applicable") else "No aplicable"}
+- Anomalías detectadas: {anomalies.get("detected_rows", 0)} filas ({anomalies.get("ratio", 0)*100:.1f}%)
 
-- Estadísticas:
-{ml_result}
+### Reglas estrictas:
+- Máximo 5 insights principales.
+- **Nunca** describas solo estadísticas. Siempre explica el **impacto en el negocio**.
+- Sé directo, crítico y estratégico.
+- Usa lenguaje de negocio (revenue, rentabilidad, riesgo, oportunidad, retención, etc.).
+- Si no hay suficiente información para un insight sólido, dilo claramente.
+- Prioriza: concentración de revenue, riesgos, oportunidades de crecimiento, segmentación de clientes.
 
-====================
-🚨 REGLAS
-====================
-- Máx 5 insights
-- Nada genérico
-- Nada inventado
-- Si no hay contexto suficiente → dilo
-
-====================
-📊 OUTPUT
-====================
+Devuelve el análisis **exactamente** en este formato:
 
 ### 🚀 Insight Principal
+[Una frase impactante que resuma el hallazgo más importante]
 
 ### 🧠 Resumen Ejecutivo
+[2-3 líneas con la visión general del dataset desde perspectiva de negocio]
 
 ### 🔍 Insights Clave
-- Qué pasa
-- Por qué pasa
-- Impacto
+1. **Título del insight**: Qué pasa + Por qué pasa + Impacto en el negocio
+2. **Título del insight**: ...
+( máximo 5 )
 
-### ⚠️ Riesgos
+### ⚠️ Riesgos Identificados
+- Riesgo 1
+- Riesgo 2
 
-### 💡 Recomendaciones
+### 💡 Recomendaciones Accionables
+- Recomendación 1 (con prioridad)
+- Recomendación 2
+- Recomendación 3
 
-====================
-
-Pensá como si esto fuera para un CEO.
+Piensa como si estuvieras presentando esto directamente al CEO en una reunión ejecutiva.
 """
 
     try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")   # Modelo más estable y rápido
+
         response = model.generate_content(prompt)
-        return response.text
+        insights_text = response.text.strip()
+
+        logger.info("Insights generados exitosamente con Gemini")
+        return insights_text
+
     except Exception as e:
-        return f"Error generando insights con IA: {str(e)}"
+        logger.error(f"Error generando insights con Gemini: {e}")
+        return f"❌ Error al generar insights: {str(e)}\n\nPor favor verifica que la API key de Gemini esté correcta y tenga saldo."
