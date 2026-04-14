@@ -7,7 +7,7 @@ import { TopNavbar } from "@/components/layout/TopNavbar";
 import { KPIGrid } from "@/components/dashboard/KPIGrid";
 import { ChartsGrid } from "@/components/dashboard/ChartsGrid";
 import { AdvancedAnalyticsPanel } from "@/components/dashboard/AdvancedAnalyticsPanel";
-import ChatDataset from "@/components/dashboard/ChatDataset";
+import { ChatDataset } from "@/components/dashboard/ChatDataset"
 import { Loader2, AlertCircle } from "lucide-react";
 import type { AnalysisResponse } from "@/types/analysis";
 
