@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
@@ -20,51 +20,57 @@ interface KpiCardProps {
 const colorVariants = {
   blue: {
     bg: "from-blue-500/10 to-blue-600/5",
-    border: "border-blue-500/20",
+    border: "border-blue-500/10 hover:border-blue-500/30",
     icon: "text-blue-400",
     iconBg: "bg-blue-500/10",
-    value: "text-blue-100",
+    value: "text-white",
     trend: "text-blue-400",
+    glow: "group-hover:bg-blue-500/5",
   },
   emerald: {
     bg: "from-emerald-500/10 to-emerald-600/5",
-    border: "border-emerald-500/20",
+    border: "border-emerald-500/10 hover:border-emerald-500/30",
     icon: "text-emerald-400",
     iconBg: "bg-emerald-500/10",
-    value: "text-emerald-100",
+    value: "text-white",
     trend: "text-emerald-400",
+    glow: "group-hover:bg-emerald-500/5",
   },
   amber: {
     bg: "from-amber-500/10 to-amber-600/5",
-    border: "border-amber-500/20",
+    border: "border-amber-500/10 hover:border-amber-500/30",
     icon: "text-amber-400",
     iconBg: "bg-amber-500/10",
-    value: "text-amber-100",
+    value: "text-white",
     trend: "text-amber-400",
+    glow: "group-hover:bg-amber-500/5",
   },
   rose: {
     bg: "from-rose-500/10 to-rose-600/5",
-    border: "border-rose-500/20",
+    border: "border-rose-500/10 hover:border-rose-500/30",
     icon: "text-rose-400",
     iconBg: "bg-rose-500/10",
-    value: "text-rose-100",
+    value: "text-white",
     trend: "text-rose-400",
+    glow: "group-hover:bg-rose-500/5",
   },
   violet: {
     bg: "from-violet-500/10 to-violet-600/5",
-    border: "border-violet-500/20",
+    border: "border-violet-500/10 hover:border-violet-500/30",
     icon: "text-violet-400",
     iconBg: "bg-violet-500/10",
-    value: "text-violet-100",
+    value: "text-white",
     trend: "text-violet-400",
+    glow: "group-hover:bg-violet-500/5",
   },
   cyan: {
     bg: "from-cyan-500/10 to-cyan-600/5",
-    border: "border-cyan-500/20",
+    border: "border-cyan-500/10 hover:border-cyan-500/30",
     icon: "text-cyan-400",
     iconBg: "bg-cyan-500/10",
-    value: "text-cyan-100",
+    value: "text-white",
     trend: "text-cyan-400",
+    glow: "group-hover:bg-cyan-500/5",
   },
 };
 
@@ -80,81 +86,87 @@ export function KpiCard({
   className,
 }: KpiCardProps) {
   const colors = colorVariants[color];
-  
   const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
-  
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      whileHover={{ y: -4 }}
+      transition={{ 
+        delay, 
+        duration: 0.3, 
+        ease: "easeOut",
+        whileHover: { duration: 0.2 }
+      }}
+      className="h-full"
     >
       <Card
         className={cn(
-          "relative overflow-hidden",
-          "bg-gradient-to-br border",
-          colors.bg,
+          "relative h-full overflow-hidden",
+          "bg-[#0f0f0f] border transition-all duration-300",
           colors.border,
-          "hover:shadow-lg hover:shadow-black/20",
-          "transition-all duration-300",
           "group cursor-pointer",
           className
         )}
       >
-        {/* Glow effect on hover */}
+        {/* Subtle background gradient */}
         <div className={cn(
-          "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
+          "absolute inset-0 opacity-20 transition-opacity duration-500",
           "bg-gradient-to-br",
-          colors.bg
+          colors.bg,
+          "group-hover:opacity-40"
         )} />
-        
-        <div className="relative p-5">
+
+        <div className="relative p-6 h-full flex flex-col">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
+            <div className="space-y-1">
+              <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest">
+                {title}
+              </p>
+            </div>
             <div className={cn(
-              "p-2.5 rounded-xl",
-              colors.iconBg
+              "p-2 rounded-lg transition-colors duration-300",
+              colors.iconBg,
+              "group-hover:bg-opacity-20"
             )}>
-              <Icon className={cn("w-5 h-5", colors.icon)} />
+              <Icon className={cn("w-4 h-4", colors.icon)} />
+            </div>
+          </div>
+
+          {/* Value Section */}
+          <div className="mt-auto space-y-1">
+            <div className="flex items-baseline gap-2">
+              <h2 className={cn(
+                "text-4xl font-bold tracking-tight",
+                colors.value
+              )}>
+                {value}
+              </h2>
+              {trend && (
+                <div className={cn(
+                  "flex items-center text-[13px] font-semibold",
+                  colors.trend
+                )}>
+                  <TrendIcon className="w-3.5 h-3.5 mr-0.5" />
+                  {trendValue}
+                </div>
+              )}
             </div>
             
-            {trend && (
-              <div className={cn(
-                "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full",
-                colors.trend,
-                "bg-white/5"
-              )}>
-                <TrendIcon className="w-3 h-3" />
-                {trendValue}
-              </div>
-            )}
-          </div>
-          
-          {/* Value */}
-          <div className="space-y-1">
-            <h3 className="text-2xl font-medium text-neutral-300">{title}</h3>
-            <p className={cn(
-              "text-3xl font-bold tracking-tight",
-              colors.value
-            )}>
-              {value}
-            </p>
             {subtitle && (
-              <p className="text-s text-neutral-400">{subtitle}</p>
+              <p className="text-[13px] font-medium text-neutral-500 leading-relaxed">
+                {subtitle}
+              </p>
             )}
           </div>
-          
-          {/* Bottom decoration line */}
+
+          {/* Premium Bottom Accent */}
           <div className={cn(
-            "absolute bottom-0 left-0 right-0 h-0.5",
-            "bg-gradient-to-r",
-            color === "blue" ? "from-blue-500/50 via-blue-400/30 to-transparent" :
-            color === "emerald" ? "from-emerald-500/50 via-emerald-400/30 to-transparent" :
-            color === "amber" ? "from-amber-500/50 via-amber-400/30 to-transparent" :
-            color === "rose" ? "from-rose-500/50 via-rose-400/30 to-transparent" :
-            color === "violet" ? "from-violet-500/50 via-violet-400/30 to-transparent" :
-            "from-cyan-500/50 via-cyan-400/30 to-transparent",
-            "transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
+            "absolute bottom-0 left-0 right-0 h-[1.5px] opacity-0 group-hover:opacity-100 transition-opacity duration-500",
+            "bg-gradient-to-r from-transparent via-current to-transparent",
+            colors.icon
           )} />
         </div>
       </Card>
