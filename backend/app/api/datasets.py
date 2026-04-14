@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.db.database import DatasetAnalysis, SessionLocal, get_db
 from app.services.data_pipeline import process_dataset
-from app.services.agent_reasoning import generate_business_insights
+# CORRECCIÓN: Importamos la función con su nombre real y usamos alias
+from app.services.agent_reasoning import generate_insights as generate_business_insights
 from app.services.pdf_generator import generate_pdf_report
 from app.services.pptx_generator import generate_pptx_report
 from app.services.chat_service import chat_with_dataset, generate_sample_questions
@@ -38,9 +39,9 @@ def make_json_serializable(obj):
         return {str(k): make_json_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple, np.ndarray)):
         return [make_json_serializable(i) for i in obj]
-    elif isinstance(obj, np.integer):      # cubre int64, int32, int16, int8, etc.
+    elif isinstance(obj, np.integer):
         return int(obj)
-    elif isinstance(obj, np.floating):     # cubre float64, float32, float16, etc.
+    elif isinstance(obj, np.floating):
         if np.isnan(obj) or np.isinf(obj):
             return None
         return float(obj)
@@ -160,6 +161,7 @@ def run_analysis_pipeline(file_id: str, file_path: str):
         if result is None:
             raise ValueError("process_dataset devolvió None — revisar data_pipeline.py")
 
+        # Generación de insights de negocio usando la función correcta
         insights = generate_business_insights(result)
         result["business_insights"] = insights
 
