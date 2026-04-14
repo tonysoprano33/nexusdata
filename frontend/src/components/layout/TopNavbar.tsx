@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import {
@@ -10,7 +10,9 @@ import {
   Download,
   Share2,
   MoreHorizontal,
-  Loader2
+  Loader2,
+  Menu,
+  Sparkles
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TopNavbarProps {
   sidebarCollapsed: boolean;
@@ -35,8 +37,8 @@ interface TopNavbarProps {
   onExportPPT?: () => void;
 }
 
-export function TopNavbar({ 
-  sidebarCollapsed, 
+export function TopNavbar({
+  sidebarCollapsed,
   datasetName,
   datasetStatus,
   dataQualityScore,
@@ -46,15 +48,23 @@ export function TopNavbar({
 }: TopNavbarProps) {
   const [isDark, setIsDark] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const getStatusConfig = () => {
     switch (datasetStatus) {
       case "processing":
         return { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", label: "Processing" };
       case "completed":
-        return { color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", label: "Ready" };
+        return { color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", label: "Live" };
       case "failed":
-        return { color: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", label: "Error" };
+        return { color: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", label: "Error" };  
       default:
         return { color: "text-neutral-400", bg: "bg-neutral-500/10", border: "border-neutral-500/20", label: "Draft" };
     }
@@ -67,159 +77,101 @@ export function TopNavbar({
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className={cn(
-        "fixed top-0 right-0 z-30 h-16",
-        "bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/[0.08]",
-        "flex items-center justify-between px-6",
-        "transition-all duration-300"
+        "fixed top-0 right-0 z-30 h-16 transition-all duration-300",
+        "bg-[#0a0a0a]/80 backdrop-blur-2xl border-b border-white/[0.06]",
+        "flex items-center justify-between px-4 sm:px-8",
+        isMobile ? "left-0 w-full" : sidebarCollapsed ? "left-20 w-[calc(100%-80px)]" : "left-64 w-[calc(100%-256px)]"
       )}
-      style={{ 
-        left: sidebarCollapsed ? 80 : 260,
-        width: `calc(100% - ${sidebarCollapsed ? 80 : 260}px)`
-      }}
     >
-      {/* Left: Search */}
-      <div className="flex items-center gap-4 flex-1 max-w-xl">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+      {/* Left: Mobile Menu & Search */}
+      <div className="flex items-center gap-4 flex-1">
+        <Button variant="ghost" size="icon" className="lg:hidden text-neutral-400 hover:text-white">
+          <Menu className="w-5 h-5" />
+        </Button>
+
+        <div className="relative hidden sm:flex items-center flex-1 max-w-[400px] group">
+          <Search className="absolute left-3 w-4 h-4 text-neutral-500 group-focus-within:text-blue-400 transition-colors" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar datasets, insights, métricas..."
-            className="pl-10 bg-white/[0.04] border-white/[0.08] text-white placeholder:text-neutral-500 h-9 focus:ring-2 focus:ring-blue-500/20"
+            placeholder="Search metrics, reports, datasets..."
+            className="pl-10 pr-12 bg-white/5 border-white/5 hover:bg-white/[0.08] text-sm text-white placeholder:text-neutral-500 h-10 rounded-xl transition-all border-none focus-visible:ring-1 focus-visible:ring-blue-500/50"
           />
+          <div className="absolute right-3 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] text-neutral-500 font-mono pointer-events-none group-focus-within:opacity-0 transition-opacity">
+            ⌘K
+          </div>
         </div>
       </div>
 
-      {/* Center: Dataset Info (if available) */}
+      {/* Center: Dataset Status */}
       {datasetName && (
-        <div className="hidden md:flex items-center gap-3 px-4">
-          <div className="h-4 w-px bg-white/[0.08]" />
-          <span className="text-sm text-neutral-400">Dataset:</span>
-          <span className="text-sm font-medium text-white truncate max-w-[200px]">
-            {datasetName}
-          </span>
-          <Badge 
-            variant="outline" 
-            className={cn(
-              "text-xs px-2 py-0.5",
-              statusConfig.bg,
-              statusConfig.border,
-              statusConfig.color
-            )}
-          >
-            {datasetStatus === "processing" && (
-              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-            )}
-            {statusConfig.label}
-          </Badge>
-          {dataQualityScore !== undefined && (
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-xs px-2 py-0.5",
-                dataQualityScore >= 90 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                dataQualityScore >= 70 ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                "bg-rose-500/10 text-rose-400 border-rose-500/20"
-              )}
-            >
-              Quality: {dataQualityScore}%
-            </Badge>
-          )}
+        <div className="hidden xl:flex items-center gap-4">
+          <div className="flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06]">
+             <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+             <span className="text-[13px] font-bold text-white tracking-tight">
+              {datasetName}
+            </span>
+            <div className="w-1 h-1 rounded-full bg-neutral-600" />
+            <div className="flex items-center gap-1.5">
+              {datasetStatus === "processing" && <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />}
+              <span className={cn("text-[11px] font-bold uppercase tracking-wider", statusConfig.color)}>
+                {statusConfig.label}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-2">
-        {/* Upload Button */}
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2 mr-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-neutral-400 hover:text-white hover:bg-white/5 h-9 w-9"       
+          >
+            <Bell className="w-4.5 h-4.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-neutral-400 hover:text-white hover:bg-white/5 h-9 w-9"       
+          >
+            {isDark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+          </Button>
+        </div>
+
         <Button
           onClick={onUploadClick}
           size="sm"
-          className="bg-blue-600 hover:bg-blue-500 text-white h-9 px-3"
+          className="bg-white text-black hover:bg-neutral-200 font-bold h-9 px-4 rounded-xl shadow-lg transition-transform active:scale-95"
         >
-          <Plus className="w-4 h-4 mr-1.5" />
+          <Plus className="w-4 h-4 mr-1.5 stroke-[3]" />
           <span className="hidden sm:inline">New Dataset</span>
         </Button>
 
-        {/* Export Dropdown */}
-        {(onExportPDF || onExportPPT) && (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "border-white/[0.08] text-neutral-300 hover:bg-white/[0.06] hover:text-white h-9"
-              )}
-            >
-                <Download className="w-4 h-4 mr-1.5" />
-                <span className="hidden sm:inline">Export</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-white/[0.08] text-white">
-              {onExportPDF && (
-                <DropdownMenuItem 
-                  onClick={onExportPDF}
-                  className="hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer"
-                >
-                  <Download className="w-4 h-4 mr-2 text-neutral-400" />
-                  Export as PDF
-                </DropdownMenuItem>
-              )}
-              {onExportPPT && (
-                <DropdownMenuItem 
-                  onClick={onExportPPT}
-                  className="hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer"
-                >
-                  <Download className="w-4 h-4 mr-2 text-neutral-400" />
-                  Export as PowerPoint
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator className="bg-white/[0.08]" />
-              <DropdownMenuItem className="hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer">
-                <Share2 className="w-4 h-4 mr-2 text-neutral-400" />
-                Share Report
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        {/* Theme Toggle */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsDark(!isDark)}
-          className="border-white/[0.08] text-neutral-400 hover:bg-white/[0.06] hover:text-white h-9 w-9"
-        >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </Button>
-
-        {/* Notifications */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="border-white/[0.08] text-neutral-400 hover:bg-white/[0.06] hover:text-white h-9 w-9 relative"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
-        </Button>
-
-        {/* More Options */}
         <DropdownMenu>
-          <DropdownMenuTrigger
-            className={cn(
-              buttonVariants({ variant: "outline", size: "icon" }),
-              "border-white/[0.08] text-neutral-400 hover:bg-white/[0.06] hover:text-white h-9 w-9"
-            )}
-          >
-              <MoreHorizontal className="w-4 h-4" />
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="border-white/10 bg-white/5 text-neutral-400 hover:text-white h-9 w-9 rounded-xl transition-all"
+            >
+                <MoreHorizontal className="w-5 h-5" />
+            </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-white/[0.08] text-white">
-            <DropdownMenuItem className="hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer">
-              Keyboard Shortcuts
+          <DropdownMenuContent align="end" className="bg-[#141414] border-neutral-800 text-neutral-300 min-w-[200px] p-2 rounded-2xl shadow-2xl">
+            <DropdownMenuItem className="rounded-xl focus:bg-white/5 py-2.5">
+              <Share2 className="w-4 h-4 mr-2" />
+              Share workspace
             </DropdownMenuItem>
-            <DropdownMenuItem className="hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer">
-              Help & Support
+            <DropdownMenuItem className="rounded-xl focus:bg-white/5 py-2.5">
+              <Download className="w-4 h-4 mr-2" />
+              Export data
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-white/[0.08]" />
-            <DropdownMenuItem className="hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer text-red-400">
-              Sign Out
+            <DropdownMenuSeparator className="bg-white/5 my-1" />
+            <DropdownMenuItem className="rounded-xl focus:bg-red-500/10 focus:text-red-400 text-red-500/80 py-2.5">
+              Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,13 +10,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  MoreHorizontal, 
-  Download, 
-  Expand, 
+import {
+  MoreHorizontal,
+  Download,
+  Expand,
   Lightbulb,
   Maximize2,
-  X
+  X,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -50,14 +51,14 @@ export function ChartContainer({
     switch (type) {
       case 'bar': return '📊';
       case 'line': return '📈';
-      case 'area': return '🏔️';
-      case 'pie': return '🥧';
+      case 'area': return '📉';
+      case 'pie': return '🍕';
       case 'scatter': return '🔵';
       case 'heatmap': return '🔥';
       case 'histogram': return '📶';
       case 'box':
       case 'boxplot': return '📦';
-      default: return '📉';
+      default: return '📊';
     }
   };
 
@@ -65,81 +66,70 @@ export function ChartContainer({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.4 }}
+      transition={{ delay: index * 0.1, duration: 0.5, ease: "easeOut" }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={className}
+      className={cn("h-full", className)}
     >
       <Card className={cn(
-        "bg-[#141416] border-white/[0.06] overflow-hidden",
-        "hover:border-white/[0.12] transition-all duration-300",
+        "bg-[#0f0f0f] border-neutral-800/60 overflow-hidden h-full flex flex-col transition-all duration-300 shadow-xl",
+        "hover:border-neutral-700 hover:shadow-2xl hover:shadow-black/50",
         "group",
-        isFullScreen && "fixed inset-4 z-50"
+        isFullScreen && "fixed inset-4 z-50 bg-[#0a0a0a]"
       )}>
         {/* Header */}
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <CardTitle className="text-base font-semibold text-white flex items-center gap-2">
-                  <span className="text-lg">{getChartIcon()}</span>
-                  <span className="truncate">{title}</span>
+        <CardHeader className="p-6 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="text-xl group-hover:scale-110 transition-transform duration-300">
+                  {getChartIcon()}
+                </div>
+                <CardTitle className="text-xl font-bold text-white tracking-tight leading-none truncate">
+                  {title}
                 </CardTitle>
+                <Badge
+                  variant="outline"
+                  className="hidden sm:flex text-[9px] uppercase tracking-[0.15em] border-white/5 text-neutral-500 px-2 py-0.5 font-bold"
+                >
+                  {type}
+                </Badge>
               </div>
-              
+
               {description && (
-                <CardDescription className="text-xs text-neutral-500 line-clamp-1">
+                <CardDescription className="text-[13px] text-neutral-400 font-medium line-clamp-1">
                   {description}
                 </CardDescription>
               )}
-              
-              {insight && (
-                <div className="flex items-start gap-1.5 mt-2">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-neutral-400 line-clamp-2">
-                    {insight}
-                  </p>
-                </div>
-              )}
             </div>
 
-            <div className="flex items-center gap-1 ml-3">
-              <Badge 
-                variant="outline" 
-                className="text-[10px] uppercase tracking-wider border-white/[0.08] text-neutral-500 px-1.5 py-0.5"
-              >
-                {type}
-              </Badge>
-              
+            <div className="flex items-center gap-2">
               <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={cn(
-                    buttonVariants({ variant: "ghost", size: "icon" }),
-                    "h-7 w-7 text-neutral-500 hover:text-white hover:bg-white/[0.06]"
-                  )}
-                >
-                    <MoreHorizontal className="w-4 h-4" />
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                    <MoreHorizontal className="w-5 h-5" />
+                  </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-white/[0.08]">
-                  <DropdownMenuItem className="text-neutral-300 hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer text-xs">
-                    <Download className="w-3.5 h-3.5 mr-2" />
-                    Download PNG
+                <DropdownMenuContent align="end" className="bg-[#141414] border-neutral-800 text-neutral-300">
+                  <DropdownMenuItem className="focus:bg-white/5 cursor-pointer py-2">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Analysis
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-neutral-300 hover:bg-white/[0.06] focus:bg-white/[0.06] cursor-pointer text-xs">
-                    <Expand className="w-3.5 h-3.5 mr-2" />
-                    View Data
+                  <DropdownMenuItem className="focus:bg-white/5 cursor-pointer py-2">
+                    <Expand className="w-4 h-4 mr-2" />
+                    Expand view
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               {onFullScreen && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7 text-neutral-500 hover:text-white hover:bg-white/[0.06]"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-neutral-500 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                   onClick={onFullScreen}
                 >
-                  {isFullScreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  {isFullScreen ? <X className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
                 </Button>
               )}
             </div>
@@ -147,34 +137,49 @@ export function ChartContainer({
         </CardHeader>
 
         {/* Chart Content */}
-        <CardContent className={cn("pt-0", isFullScreen && "flex-1")}>
+        <CardContent className={cn("p-6 pt-0 flex-1 flex flex-col min-h-0")}>
           <div className={cn(
-            "relative rounded-lg overflow-hidden",
-            isFullScreen ? "h-[calc(100vh-200px)]" : "h-[300px]"
+            "relative rounded-xl overflow-hidden bg-neutral-900/40 border border-neutral-800/40 p-4 transition-all duration-500 group-hover:bg-neutral-900/60",
+            isFullScreen ? "flex-1" : "h-[350px]"
           )}>
             {children}
-            
-            {/* Hover overlay with actions */}
+
+            {/* Hover overlay with actions - refined */}
             <div className={cn(
-              "absolute inset-0 bg-black/40 backdrop-blur-sm",
-              "flex items-center justify-center gap-3",
-              "transition-opacity duration-200",
-              isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+              "absolute inset-0 bg-[#0a0a0a]/60 backdrop-blur-[2px]",
+              "flex items-center justify-center",
+              "transition-all duration-300 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
             )}>
-              <Button 
-                size="sm" 
-                variant="secondary"
-                className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+              <Button
+                size="md"
+                className="bg-white text-black hover:bg-neutral-200 font-bold rounded-xl px-6 shadow-2xl scale-90 group-hover:scale-100 transition-transform duration-300"
               >
-                <Expand className="w-4 h-4 mr-1.5" />
-                Explore
+                <Expand className="w-4 h-4 mr-2" />
+                Explorar Datos
               </Button>
             </div>
           </div>
+
+          {/* AI Insight Box - Much more prominent */}
+          {insight && (
+            <div className="mt-5 p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 group-hover:border-blue-500/20 transition-all duration-300">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1 rounded bg-blue-500/20">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                </div>
+                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">
+                  AI Observation
+                </span>
+              </div>
+              <p className="text-[14px] text-neutral-300 leading-relaxed font-medium">
+                {insight}
+              </p>
+            </div>
+          )}
         </CardContent>
 
-        {/* Bottom gradient line */}
-        <div className="h-[2px] bg-gradient-to-r from-transparent via-white/[0.1] to-transparent" />
+        {/* Bottom accent */}
+        <div className="h-1 w-full bg-gradient-to-r from-transparent via-neutral-800 to-transparent opacity-30" />
       </Card>
     </motion.div>
   );
