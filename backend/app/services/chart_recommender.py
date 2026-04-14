@@ -11,140 +11,88 @@ logger = logging.getLogger(__name__)
 
 
 def _fallback_chart_recommendations(data_stats: dict) -> List[Dict[str, Any]]:
-    """Fallback inteligente cuando Gemini no está disponible."""
+    """Fallback inteligente cuando Gemini falla o no está disponible."""
     column_types = data_stats.get("column_types", {})
     numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
     categorical_cols = [col for col, t in column_types.items() if t == "categorical"]
-    datetime_cols = [col for col, t in column_types.items() if t == "datetime"]
 
-    recommendations: List[Dict[str, Any]] = []
-    seen = set()
-
-    def add_chart(chart_type: str, x: str, y: str, title: str, insight: str, priority: int):
-        key = (chart_type, x, y)
-        if key in seen:
-            return
-        seen.add(key)
-        recommendations.append({
-            "type": chart_type,
-            "x_column": x,
-            "y_column": y,
-            "title": title,
-            "insight": insight,
-            "priority": priority,
-        })
-
-    # Recomendaciones de alto valor de negocio
-    if datetime_cols and numeric_cols:
-        add_chart(
-            "line", datetime_cols[0], numeric_cols[0],
-            f"Evolución de {numeric_cols[0]}",
-            f"Tendencia temporal clave para entender crecimiento o caída del negocio",
-            1
-        )
+    recommendations = []
 
     if categorical_cols and numeric_cols:
-        add_chart(
-            "bar", categorical_cols[0], numeric_cols[0],
-            f"{numeric_cols[0]} por {categorical_cols[0]}",
-            f"Identifica qué segmentos generan más valor o representan mayor riesgo",
-            2
-        )
-        add_chart(
-            "box", categorical_cols[0], numeric_cols[0],
-            f"Distribución de {numeric_cols[0]} por segmento",
-            f"Revela variabilidad y posibles outliers por grupo de clientes/productos",
-            3
-        )
+        recommendations.append({
+            "type": "bar",
+            "x_column": categorical_cols[0],
+            "y_column": numeric_cols[0],
+            "title": f"{numeric_cols[0]} por {categorical_cols[0]}",
+            "insight": f"Identifica qué categorías generan más valor en {numeric_cols[0]}",
+            "priority": 1
+        })
 
     if numeric_cols:
-        add_chart(
-            "histogram", "", numeric_cols[0],
-            f"Distribución de {numeric_cols[0]}",
-            f"Entiende el comportamiento típico y los valores extremos del negocio",
-            4
-        )
+        recommendations.append({
+            "type": "histogram",
+            "x_column": "",
+            "y_column": numeric_cols[0],
+            "title": f"Distribución de {numeric_cols[0]}",
+            "insight": f"Entiende la concentración y valores atípicos de la métrica principal",
+            "priority": 2
+        })
 
     if len(numeric_cols) >= 2:
-        add_chart(
-            "scatter", numeric_cols[0], numeric_cols[1],
-            f"Relación {numeric_cols[0]} vs {numeric_cols[1]}",
-            f"¿Existe correlación o trade-off entre estas dos métricas clave?",
-            5
-        )
+        recommendations.append({
+            "type": "scatter",
+            "x_column": numeric_cols[0],
+            "y_column": numeric_cols[1],
+            "title": f"Relación entre {numeric_cols[0]} y {numeric_cols[1]}",
+            "insight": f"Analiza si existe correlación o trade-off entre estas métricas",
+            "priority": 3
+        })
 
-    return recommendations[:5]
+    return recommendations[:4]
 
 
 def generate_chart_recommendations(data_stats: dict, sample_data: dict = None) -> List[Dict[str, Any]]:
-    """
-    Genera recomendaciones de gráficos **orientadas a negocio** usando Gemini.
-    Prioriza insights accionables para toma de decisiones.
-    """
+    """Genera recomendaciones de gráficos usando Gemini (con fallback seguro)."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        logger.warning("GEMINI_API_KEY no encontrada. Usando fallback.")
+        logger.warning("No GEMINI_API_KEY encontrada - usando fallback")
         return _fallback_chart_recommendations(data_stats)
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel("gemini-2.0-flash")   # Modelo correcto para 2026
 
-        column_types = data_stats.get('column_types', {})
-        numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
-        categorical_cols = [col for col, t in column_types.items() if t == 'categorical']
-        datetime_cols = [col for col, t in column_types.items() if t == 'datetime']
-
-        num_numeric = len(numeric_cols)
-        num_categorical = len(categorical_cols)
-        has_strong_correlation = bool(data_stats.get('correlation_matrix'))
-
-        target_count = 4 if (num_numeric >= 4 and has_strong_correlation) else \
-                       3 if num_numeric >= 3 else 2
+        numeric_cols = [col for col, t in data_stats.get("column_types", {}).items() if t == "numeric"]
+        categorical_cols = [col for col, t in data_stats.get("column_types", {}).items() if t != "numeric"]
 
         prompt = f"""
-Eres un Data Analyst Senior con enfoque en negocio que reporta directamente a CEO y gerentes.
+Eres un experto en visualización de datos para negocio.
 
-Analiza el siguiente dataset y recomienda **solo** los gráficos que generen **insights accionables** de valor real para el negocio.
+Dataset:
+- Numéricas: {numeric_cols}
+- Categóricas: {categorical_cols}
 
-### Información del Dataset:
-- Columnas numéricas ({num_numeric}): {numeric_cols}
-- Columnas categóricas ({num_categorical}): {categorical_cols}
-- Columnas temporales: {datetime_cols}
-- ¿Existen correlaciones fuertes? {has_strong_correlation}
-
-### Instrucciones:
-- Recomienda entre {target_count} gráficos como máximo.
-- Prioriza gráficos que respondan preguntas de negocio reales (revenue, churn, segmentación, tendencias, riesgos).
-- Evita gráficos genéricos o que no aporten decisión.
-- Cada gráfico debe tener un insight claro y útil (máximo 15 palabras).
-- Títulos cortos y profesionales (máximo 6 palabras).
-
-Devuelve **únicamente** un array JSON válido con esta estructura:
+Genera entre 2 y 4 recomendaciones de gráficos útiles para un ejecutivo.
+Devuelve SOLO un JSON válido con esta estructura:
 
 [
   {{
-    "type": "bar|line|scatter|pie|histogram|box|heatmap",
+    "type": "bar|line|scatter|histogram|box|pie",
     "x_column": "nombre_columna_x",
     "y_column": "nombre_columna_y",
-    "title": "Título corto y profesional",
-    "insight": "Insight de negocio accionable (máx 15 palabras)",
+    "title": "Título claro y profesional (máx 8 palabras)",
+    "insight": "Breve insight de negocio (máx 15 palabras)",
     "priority": 1
   }}
 ]
 
-Ejemplos de buenos insights:
-- "El 68% del revenue viene de solo 3 segmentos"
-- "La retención cae fuertemente después del mes 3"
-- "Los clientes de alto valor muestran 40% más variabilidad"
-
-Genera las recomendaciones ahora:
+Usa solo columnas que existan. Prioriza valor de negocio.
 """
 
         response = model.generate_content(prompt)
         text = response.text.strip()
 
-        # Limpiar bloques de código si existen
+        # Limpiar bloques de código
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
@@ -152,39 +100,13 @@ Genera las recomendaciones ahora:
 
         recommendations = json.loads(text)
 
-        # Validación estricta
+        # Validación básica
         valid_recs = []
-        all_cols = list(column_types.keys())
-        allowed_types = {'bar', 'line', 'scatter', 'pie', 'histogram', 'box', 'heatmap'}
+        allowed_types = {'bar', 'line', 'scatter', 'histogram', 'box', 'pie'}
 
         for rec in recommendations:
-            if not isinstance(rec, dict):
-                continue
-
-            chart_type = str(rec.get('type', '')).lower().strip()
-            x_col = rec.get('x_column')
-            y_col = rec.get('y_column')
-
-            if chart_type not in allowed_types:
-                continue
-
-            if chart_type == 'heatmap':
+            if isinstance(rec, dict) and rec.get('type') in allowed_types:
                 valid_recs.append(rec)
-                continue
-            if chart_type == 'histogram':
-                target = y_col or x_col
-                if target in numeric_cols:
-                    valid_recs.append(rec)
-                continue
-            if chart_type == 'scatter':
-                if x_col in numeric_cols and y_col in numeric_cols:
-                    valid_recs.append(rec)
-                continue
-
-            if x_col not in all_cols or (y_col and y_col not in numeric_cols):
-                continue
-
-            valid_recs.append(rec)
 
         valid_recs.sort(key=lambda x: x.get('priority', 999))
         return valid_recs[:5]
@@ -194,62 +116,64 @@ Genera las recomendaciones ahora:
         return _fallback_chart_recommendations(data_stats)
 
 
-def _safe_tolist(values) -> list:
-    """Convierte valores pandas/numpy a lista de tipos Python nativos."""
-    if hasattr(values, 'tolist'):
-        result = values.tolist()
-    else:
-        result = list(values)
+# ====================== FUNCIONES DE PREPARACIÓN ======================
 
-    clean = []
-    for v in result:
-        if isinstance(v, (np.integer, np.int64, np.int32)):
-            clean.append(int(v))
+def _safe_convert_to_list(values) -> list:
+    """Convierte valores a lista nativa de forma segura."""
+    if values is None:
+        return []
+    
+    if not pd.api.types.is_numeric_dtype(values):
+        values = pd.to_numeric(values, errors='coerce')
+    
+    clean_values = pd.Series(values).dropna()
+    
+    result = []
+    for v in clean_values:
+        if pd.isna(v):
+            continue
+        elif isinstance(v, (np.integer, np.int64, np.int32)):
+            result.append(int(v))
         elif isinstance(v, (np.floating, np.float64, np.float32)):
-            clean.append(None if (np.isnan(v) or np.isinf(v)) else float(v))
-        elif isinstance(v, np.bool_):
-            clean.append(bool(v))
+            result.append(float(v) if not (np.isnan(v) or np.isinf(v)) else None)
         else:
-            clean.append(v)
-    return clean
+            result.append(str(v))
+    return result
 
 
 def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict[str, Any] | None:
     """
-    Prepara los datos para el gráfico de forma segura y eficiente.
+    Versión limpia y robusta - evita errores de tipo DType.
     """
     try:
-        chart_type = recommendation.get('type', 'bar').lower()
+        chart_type = str(recommendation.get('type', 'bar')).lower().strip()
         x_col = recommendation.get('x_column')
         y_col = recommendation.get('y_column')
 
-        # Heatmap de correlación
         if chart_type == 'heatmap':
             numeric_cols = df.select_dtypes(include=['number']).columns.tolist()[:10]
             if len(numeric_cols) < 2:
                 return None
-            corr = df[numeric_cols].corr().fillna(0)
+            corr_matrix = df[numeric_cols].corr().fillna(0)
             return {
                 'type': 'heatmap',
-                'labels': corr.columns.tolist(),
-                'data': [_safe_tolist(row) for row in corr.values],
+                'labels': corr_matrix.columns.tolist(),
+                'data': corr_matrix.values.tolist(),
                 'title': recommendation.get('title', 'Matriz de Correlación')
             }
 
-        # Histograma
         if chart_type == 'histogram':
             target_col = y_col or x_col
-            if target_col not in df.columns:
+            if not target_col or target_col not in df.columns:
                 return None
             values = pd.to_numeric(df[target_col], errors='coerce').dropna()
             return {
                 'type': 'histogram',
-                'values': _safe_tolist(values),
+                'values': _safe_convert_to_list(values),
                 'title': recommendation.get('title', f'Distribución de {target_col}'),
                 'x_label': target_col
             }
 
-        # Scatter
         if chart_type == 'scatter':
             if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
                 return None
@@ -259,40 +183,38 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
             sample = df_scatter.sample(min(600, len(df_scatter)), random_state=42)
             return {
                 'type': 'scatter',
-                'data': sample[[x_col, y_col]].values.tolist(),
+                'data': sample.values.tolist(),
                 'title': recommendation.get('title', f'{y_col} vs {x_col}'),
                 'x_label': x_col,
                 'y_label': y_col
             }
 
-        if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
-            return None
-
-        df_clean = df[[x_col, y_col]].dropna().copy()
-
-        # Pie Chart
         if chart_type == 'pie':
-            grouped = df_clean.groupby(x_col)[y_col].sum().sort_values(ascending=False).head(8)
+            if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
+                return None
+            grouped = df.groupby(x_col)[y_col].sum().sort_values(ascending=False).head(8)
             return {
                 'type': 'pie',
-                'labels': [str(x) for x in grouped.index],
-                'values': _safe_tolist(grouped.values),
+                'labels': [str(label) for label in grouped.index],
+                'values': _safe_convert_to_list(grouped.values),
                 'title': recommendation.get('title', 'Distribución por categoría')
             }
 
-        # Bar / Line / Area
         if chart_type in ['bar', 'line', 'area']:
-            if pd.api.types.is_object_dtype(df_clean[x_col]) or \
-               pd.api.types.is_categorical_dtype(df_clean[x_col]) or \
-               pd.api.types.is_datetime64_any_dtype(df_clean[x_col]):
+            if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
+                return None
+
+            df_clean = df[[x_col, y_col]].copy()
+
+            if pd.api.types.is_object_dtype(df_clean[x_col]) or pd.api.types.is_categorical_dtype(df_clean[x_col]) or pd.api.types.is_datetime64_any_dtype(df_clean[x_col]):
                 grouped = df_clean.groupby(x_col)[y_col].mean().sort_values(ascending=False).head(12)
                 labels = [str(x) for x in grouped.index]
-                values = _safe_tolist(grouped.values)
+                values = _safe_convert_to_list(grouped.values)
             else:
-                df_clean['bin'] = pd.cut(df_clean[x_col], bins=10)
+                df_clean['bin'] = pd.cut(pd.to_numeric(df_clean[x_col], errors='coerce'), bins=10)
                 grouped = df_clean.groupby('bin')[y_col].mean()
-                labels = [f"{interval.left:.1f} - {interval.right:.1f}" for interval in grouped.index]
-                values = _safe_tolist(grouped.values)
+                labels = [f"{interval.left:.1f}–{interval.right:.1f}" for interval in grouped.index]
+                values = _safe_convert_to_list(grouped.values)
 
             return {
                 'type': chart_type,
@@ -303,15 +225,18 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
                 'y_label': y_col
             }
 
-        # Box Plot
         if chart_type == 'box':
+            if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
+                return None
+
+            df_clean = df[[x_col, y_col]].copy()
+
             if pd.api.types.is_object_dtype(df_clean[x_col]) or pd.api.types.is_string_dtype(df_clean[x_col]):
-                categories = df_clean[x_col].unique()[:8]
+                categories = df_clean[x_col].dropna().unique()[:8]
                 data_by_cat = {}
                 for cat in categories:
-                    data_by_cat[str(cat)] = _safe_tolist(
-                        df_clean[df_clean[x_col] == cat][y_col].dropna().values
-                    )
+                    cat_data = pd.to_numeric(df_clean[df_clean[x_col] == cat][y_col], errors='coerce').dropna()
+                    data_by_cat[str(cat)] = _safe_convert_to_list(cat_data)
                 return {
                     'type': 'box',
                     'categories': list(data_by_cat.keys()),
@@ -321,15 +246,16 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
                     'y_label': y_col
                 }
             else:
+                values = pd.to_numeric(df_clean[y_col], errors='coerce').dropna()
                 return {
                     'type': 'box',
                     'categories': [y_col],
-                    'data': [_safe_tolist(df_clean[y_col].dropna().values)],
+                    'data': [_safe_convert_to_list(values)],
                     'title': recommendation.get('title', f'Distribución de {y_col}')
                 }
 
         return None
 
     except Exception as e:
-        logger.error(f"Error en prepare_chart_data: {e}")
+        logger.error(f"Error en prepare_chart_data para tipo '{chart_type}': {e}")
         return None
