@@ -28,8 +28,8 @@ export default function ReportsPage() {
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
-    
-    axios.get(\/api/datasets/?limit=20&status=completed)
+
+    axios.get(`${API_URL}/api/datasets/?limit=20&status=completed`)
       .then(res => setReports(res.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
@@ -38,18 +38,18 @@ export default function ReportsPage() {
   }, []);
 
   const handleDownload = async (id: string, format: string) => {
-    setDownloadingId(\-\);
+    setDownloadingId(`${id}-${format}`);
     try {
       const response = await axios({
-        url: \/api/datasets/\/export/\,
+        url: `${API_URL}/api/datasets/${id}/export/${format}`,
         method: 'GET',
         responseType: 'blob',
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', eport-\.\);
+      link.setAttribute('download', `report-${id.slice(0,8)}.${format}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -66,17 +66,18 @@ export default function ReportsPage() {
         <EnterpriseSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       </div>
 
-      <TopNavbar sidebarCollapsed={sidebarCollapsed} datasetName="Reports Center" datasetStatus="completed" />     
+      <TopNavbar sidebarCollapsed={sidebarCollapsed} datasetName="Reports Center" datasetStatus="completed" />  
 
-      <main 
+
+      <main
         className={cn(
           "pt-24 min-h-screen transition-all duration-300 ease-in-out",
           isMobile ? "ml-0" : sidebarCollapsed ? "ml-20" : "ml-64"
         )}
-      >  
+      >
         <div className="p-4 sm:p-8 lg:p-10 max-w-[1200px] mx-auto w-full">
-          
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
+
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">      
             <div className="space-y-2">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-600/10 border border-emerald-600/20 flex items-center justify-center shadow-lg shadow-emerald-600/5">
@@ -93,8 +94,8 @@ export default function ReportsPage() {
 
             <div className="relative group w-full md:w-72">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 group-focus-within:text-emerald-400 transition-colors" />
-               <Input 
-                 placeholder="Search by filename..." 
+               <Input
+                 placeholder="Search by filename..."
                  className="bg-neutral-900 border-neutral-800/50 pl-10 h-11 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500/20 border-none transition-all"
                />
             </div>
@@ -104,10 +105,10 @@ export default function ReportsPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-32 gap-4">
                 <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
-                <p className="text-neutral-500 font-medium animate-pulse">Loading available analyses...</p>
+                <p className="text-neutral-500 font-medium animate-pulse">Loading available analyses...</p>     
               </div>
             ) : reports.length === 0 ? (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-[#0f0f0f] border border-neutral-800/60 border-dashed rounded-[2.5rem] p-24 text-center group"
@@ -133,7 +134,7 @@ export default function ReportsPage() {
                     >
                       <Card className="bg-[#0f0f0f] border-neutral-800/60 hover:border-emerald-500/30 transition-all duration-300 rounded-[2rem] overflow-hidden group shadow-xl">
                         <CardContent className="p-8">
-                          <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-8">
+                          <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-8">       
                             {/* File Info */}
                             <div className="flex-1 min-w-0 flex items-center gap-5">
                               <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800/50 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-neutral-800 transition-all duration-500">
@@ -141,7 +142,7 @@ export default function ReportsPage() {
                               </div>
                               <div className="space-y-1.5 truncate">
                                 <div className="flex items-center gap-3">
-                                  <h3 className="text-xl font-bold text-white tracking-tight truncate leading-none">{report.filename}</h3>      
+                                  <h3 className="text-xl font-bold text-white tracking-tight truncate leading-none">{report.filename}</h3>
                                   <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] font-black uppercase tracking-widest px-2 py-0.5">READY</Badge>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-neutral-500 font-medium">
@@ -156,24 +157,24 @@ export default function ReportsPage() {
                             <div className="flex flex-wrap sm:flex-nowrap items-center gap-4">
                               <Button
                                 onClick={() => handleDownload(report.id, 'pdf')}
-                                disabled={downloadingId === \-pdf}
-                                variant="outline" 
+                                disabled={downloadingId === `${report.id}-pdf`}
+                                variant="outline"
                                 className="flex-1 sm:flex-none border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 text-neutral-300 hover:text-white font-bold h-12 px-6 rounded-2xl gap-2.5 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                               >
-                                {downloadingId === \-pdf ? (
+                                {downloadingId === `${report.id}-pdf` ? (
                                   <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : (
                                   <FileText className="w-5 h-5 text-emerald-500" />
                                 )}
                                 PDF Report
                               </Button>
-                              
+
                               <Button
                                 onClick={() => handleDownload(report.id, 'pptx')}
-                                disabled={downloadingId === \-pptx}
+                                disabled={downloadingId === `${report.id}-pptx`}
                                 className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 px-6 rounded-2xl gap-2.5 transition-all shadow-xl shadow-emerald-600/10 active:scale-95 disabled:opacity-50"
                               >
-                                {downloadingId === \-pptx ? (
+                                {downloadingId === `${report.id}-pptx` ? (
                                   <Loader2 className="w-5 h-5 animate-spin text-white" />
                                 ) : (
                                   <Presentation className="w-5 h-5 text-white" />
@@ -190,7 +191,7 @@ export default function ReportsPage() {
               </div>
             )}
           </div>
-          
+
           {/* Pro Tip Section */}
           <div className="mt-16 p-8 rounded-[2rem] bg-emerald-600/5 border border-emerald-600/10 flex flex-col md:flex-row items-center gap-8 group">
             <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:rotate-12 transition-transform duration-500">

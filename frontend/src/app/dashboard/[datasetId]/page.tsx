@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
     const fetchAnalysis = async () => {
       try {
-        const { data } = await axios.get(\/api/datasets/\);
+        const { data } = await axios.get(`${API_URL}/api/datasets/${datasetId}`);
         setAnalysis(data);
 
         if (data.status === "processing") {

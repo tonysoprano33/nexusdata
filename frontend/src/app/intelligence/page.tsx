@@ -2,16 +2,18 @@
 import { useState, useEffect } from "react";
 import { EnterpriseSidebar } from "@/components/layout/EnterpriseSidebar";
 import { TopNavbar } from "@/components/layout/TopNavbar";
-import { Brain, Sparkles, TrendingUp, Zap, MessageCircle, ArrowRight, ShieldCheck, Cpu } from "lucide-react";
+import { Brain, Sparkles, TrendingUp, Zap, MessageCircle, ArrowRight, ShieldCheck, Cpu, LayoutDashboard, Database, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 export default function IntelligencePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const checkMobile = () => {
@@ -40,6 +42,17 @@ export default function IntelligencePage() {
       >  
         <div className="p-4 sm:p-8 lg:p-10 max-w-[1400px] mx-auto w-full">
           
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-2 mb-8 text-neutral-500">
+            <div className="p-1.5 bg-neutral-900 rounded-md border border-neutral-800">
+              <Brain className="w-4 h-4 text-indigo-400" />
+            </div>
+            <ChevronRight className="w-4 h-4 opacity-30" />
+            <span className="text-[13px] font-medium text-neutral-400">Core Engine</span>
+            <ChevronRight className="w-4 h-4 opacity-30" />
+            <span className="text-[13px] font-bold text-white tracking-tight">Intelligence Hub</span>
+          </div>
+
           {/* Hero Section */}
           <div className="relative mb-12 p-8 sm:p-12 rounded-[2.5rem] bg-[#0f0f0f] border border-neutral-800/60 overflow-hidden group shadow-2xl">
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-indigo-600/15 transition-colors duration-700" />
@@ -58,11 +71,17 @@ export default function IntelligencePage() {
                   Unlock hidden patterns and global business correlations across all your data sources using our advanced Gemini-powered engine.
                 </p>
                 <div className="flex flex-wrap justify-center xl:justify-start gap-4 pt-4">
-                  <Button className="bg-white text-black hover:bg-neutral-200 font-bold h-12 px-8 rounded-2xl shadow-xl shadow-white/5 active:scale-95 transition-all">
-                    Start New Analysis
+                  <Button 
+                    onClick={() => router.push("/datasets")}
+                    className="bg-white text-black hover:bg-neutral-200 font-bold h-12 px-8 rounded-2xl shadow-xl shadow-white/5 active:scale-95 transition-all"
+                  >
+                    Select Dataset
                   </Button>
-                  <Button variant="outline" className="border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 text-white font-bold h-12 px-8 rounded-2xl transition-all">
-                    View Methodology
+                  <Button 
+                    onClick={() => router.push("/")}
+                    variant="outline" className="border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 text-white font-bold h-12 px-8 rounded-2xl transition-all"
+                  >
+                    Methodology
                   </Button>
                 </div>
               </div>
@@ -109,7 +128,10 @@ export default function IntelligencePage() {
                     Communicate with your entire data ecosystem. Ask complex questions that require context from multiple sources.
                   </p>
                 </div>
-                <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 px-8 rounded-2xl w-full sm:w-auto shadow-xl shadow-indigo-500/10 active:scale-95 transition-all">
+                <Button 
+                  onClick={() => router.push("/datasets")}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 px-8 rounded-2xl w-full sm:w-auto shadow-xl shadow-indigo-500/10 active:scale-95 transition-all"
+                >
                   Launch Neural Interface
                 </Button>
               </div>
@@ -127,7 +149,10 @@ export default function IntelligencePage() {
                     Set our background engine to proactively scan for market opportunities, risks, and statistical anomalies.
                   </p>
                 </div>
-                <Button variant="outline" className="border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 text-white font-bold h-12 px-8 rounded-2xl w-full sm:w-auto transition-all">
+                <Button 
+                  onClick={() => router.push("/datasets")}
+                  variant="outline" className="border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 text-white font-bold h-12 px-8 rounded-2xl w-full sm:w-auto transition-all"
+                >
                   Initialize Discovery Scan
                 </Button>
               </div>
