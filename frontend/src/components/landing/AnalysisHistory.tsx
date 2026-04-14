@@ -9,6 +9,8 @@ import axios from "axios";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AnalysisHistory as AnalysisHistoryType } from "@/types/analysis";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nexusdata-api.onrender.com";
+
 export function AnalysisHistory() {
   const [history, setHistory] = useState<AnalysisHistoryType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +23,7 @@ export function AnalysisHistory() {
         const params = new URLSearchParams();
         params.set("limit", "12");
         if (historyStatusFilter !== "all") params.set("status", historyStatusFilter);
-        const { data } = await axios.get("https://nexusdata-api.onrender.com/api/datasets/?" + params.toString());
+        const { data } = await axios.get(`${API_URL}/api/datasets/?` + params.toString());
         setHistory(data);
       } catch (error) {
         console.error("Error loading history", error);
@@ -46,7 +48,7 @@ export function AnalysisHistory() {
             <Clock className="h-5 w-5 text-indigo-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-white">Historial de Análisis</h2>        
+            <h2 className="text-2xl font-bold tracking-tight text-white">Historial de Análisis</h2>
             <p className="text-sm text-neutral-400">{history.length} análisis guardados</p>
           </div>
         </div>
@@ -91,7 +93,12 @@ export function AnalysisHistory() {
             </div>
           ) : (
             filteredHistory.map((item, index) => (
-              <AnalysisCard key={item.id} item={item} index={index} onClick={() => router.push(`/dashboard/${item.id}`)} />
+              <AnalysisCard
+                key={item.id}
+                item={item}
+                index={index}
+                onClick={() => router.push(`/dashboard/${item.id}`)}
+              />
             ))
           )}
         </AnimatePresence>
@@ -133,7 +140,7 @@ function AnalysisCard({ item, index, onClick }: { item: AnalysisHistoryType; ind
               </p>
             </div>
             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${config.bg} border ${config.border}`}>
-              <config.icon className={`h-3 w-3 ${config.color} ${config.spin ? 'animate-spin' : ''}`} />
+              <config.icon className={`h-3 w-3 ${config.color} ${config.spin ? "animate-spin" : ""}`} />
               <span className={`text-[10px] font-bold uppercase tracking-wider ${config.color}`}>{config.label}</span>
             </div>
           </div>
