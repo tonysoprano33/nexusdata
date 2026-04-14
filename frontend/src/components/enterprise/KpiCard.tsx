@@ -132,7 +132,7 @@ export function KpiCard({
           
           {/* Value */}
           <div className="space-y-1">
-            <h3 className="text-sm font-medium text-neutral-400">{title}</h3>
+            <h3 className="text-sm font-medium text-neutral-500">{title}</h3>
             <p className={cn(
               "text-3xl font-bold tracking-tight",
               colors.value
@@ -140,7 +140,7 @@ export function KpiCard({
               {value}
             </p>
             {subtitle && (
-              <p className="text-xs text-neutral-500">{subtitle}</p>
+              <p className="text-s text-neutral-400">{subtitle}</p>
             )}
           </div>
           
