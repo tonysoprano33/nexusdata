@@ -1,66 +1,193 @@
 import os
 import json
+import numpy as np
+import pandas as pd
 import google.generativeai as genai
 
-def generate_business_insights(data_stats: dict) -> str:
-    """
-    Genera insights de negocio precisos y concisos usando Gemini.
-    Máximo impacto con mínimo texto.
-    """
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.metrics import accuracy_score, r2_score
+from sklearn.preprocessing import LabelEncoder
+
+
+# =========================================
+# 🧠 DETECCIÓN DE TARGET INTELIGENTE
+# =========================================
+
+def detect_target(df: pd.DataFrame):
+    # Prioridad: columnas tipo churn / target / label
+    for col in df.columns:
+        if col.lower() in ["churn", "target", "label", "outcome"]:
+            return col
+
+    # Si hay booleanos/binarios
+    for col in df.columns:
+        if df[col].nunique() == 2:
+            return col
+
+    return None
+
+
+# =========================================
+# 🧠 PREPROCESAMIENTO
+# =========================================
+
+def encode_dataframe(df: pd.DataFrame):
+    df_encoded = df.copy()
+    encoders = {}
+
+    for col in df_encoded.select_dtypes(include=['object']).columns:
+        le = LabelEncoder()
+        df_encoded[col] = le.fit_transform(df_encoded[col].astype(str))
+        encoders[col] = le
+
+    return df_encoded, encoders
+
+
+def get_top_correlations(df: pd.DataFrame, top_n=3):
+    corr = df.corr(numeric_only=True)
+    pairs = []
+
+    for col1 in corr.columns:
+        for col2 in corr.columns:
+            if col1 != col2:
+                pairs.append((col1, col2, corr.loc[col1, col2]))
+
+    pairs = sorted(pairs, key=lambda x: abs(x[2]), reverse=True)
+
+    seen = set()
+    result = []
+    for a, b, v in pairs:
+        key = tuple(sorted([a, b]))
+        if key not in seen:
+            seen.add(key)
+            result.append((a, b, round(v, 3)))
+        if len(result) >= top_n:
+            break
+
+    return result
+
+
+# =========================================
+# 🤖 ML AUTOMÁTICO
+# =========================================
+
+def run_ml(df: pd.DataFrame, target_col: str):
+    try:
+        df_encoded, _ = encode_dataframe(df)
+
+        X = df_encoded.drop(columns=[target_col])
+        y = df_encoded[target_col]
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+        # Clasificación
+        if y.nunique() <= 10:
+            model = LogisticRegression(max_iter=1000)
+            model.fit(X_train, y_train)
+            preds = model.predict(X_test)
+
+            return {
+                "type": "classification",
+                "score": round(accuracy_score(y_test, preds), 3)
+            }
+
+        # Regresión
+        else:
+            model = LinearRegression()
+            model.fit(X_train, y_train)
+            preds = model.predict(X_test)
+
+            return {
+                "type": "regression",
+                "score": round(r2_score(y_test, preds), 3)
+            }
+
+    except Exception:
+        return None
+
+
+# =========================================
+# 🧠 GENERADOR DE INSIGHTS (CORE)
+# =========================================
+
+def generate_insights(df: pd.DataFrame) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        return "Insight Engine Disabled. Please set GEMINI_API_KEY to activate."
-        
+        return "Missing GEMINI_API_KEY"
+
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-flash-latest')
-    
-    # Extraer datos clave para análisis
-    numeric_cols = [k for k, v in data_stats.get('column_types', {}).items() if v == 'numeric']
-    categorical_cols = [k for k, v in data_stats.get('column_types', {}).items() if v == 'categorical']
-    quality_score = data_stats.get('summary', {}).get('data_quality_score', 0)
-    total_rows = data_stats.get('summary', {}).get('total_rows', 0)
-    
+    model = genai.GenerativeModel("gemini-2.5-flash")
+
+    # =========================
+    # 📊 MÉTRICAS BASE
+    # =========================
+
+    total_rows = len(df)
+    missing = df.isna().sum().sum()
+    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+    categorical_cols = df.select_dtypes(exclude=np.number).columns.tolist()
+
+    # =========================
+    # 🧠 INTELIGENCIA
+    # =========================
+
+    target = detect_target(df)
+    correlations = get_top_correlations(df)
+    ml_result = run_ml(df, target) if target else None
+
+    # =========================
+    # 🧠 PROMPT FINAL PRO
+    # =========================
+
     prompt = f"""
-    Actúa como Data Scientist Senior. Analiza estos datos y responde EXACTAMENTE con este formato:
+Actúa como un Data Analyst senior orientado a negocio.
 
-    📊 **Punto Clave 1**: [Insight principal en 10 palabras máximo]
-    💡 **Acción**: [Recomendación específica en 1 línea]
-    
-    📊 **Punto Clave 2**: [Segundo insight si aplica]
-    💡 **Acción**: [Recomendación específica]
-    
-    ⚠️ **Alerta**: [Solo si hay problema crítico, si no omitir]
+NO describas datos. Genera decisiones.
 
-    REGLAS ESTRICTAS:
-    - Máximo 3 puntos clave
-    - Cada punto: 10 palabras máximo
-    - Sin introducción ni conclusión
-    - Lenguaje ejecutivo: directo, sin relleno
-    - Enfocado en: {', '.join(numeric_cols[:3])} y {', '.join(categorical_cols[:2])}
-    - Contexto: {total_rows} filas, calidad {quality_score}%
+====================
+📊 DATASET
+====================
+- Filas: {total_rows}
+- Missing: {missing}
+- Numéricas: {numeric_cols[:6]}
+- Categóricas: {categorical_cols[:6]}
+- Target detectado: {target if target else "No detectado"}
 
-    Datos: {json.dumps(data_stats, indent=2)[:800]}
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        text = response.text.strip()
-        
-        # Limpiar respuesta si es muy larga
-        if len(text) > 800:
-            lines = text.split('\n')
-            short_lines = []
-            total_len = 0
-            for line in lines:
-                if total_len + len(line) < 700:
-                    short_lines.append(line)
-                    total_len += len(line)
-                else:
-                    break
-            text = '\n'.join(short_lines) + '\n\n*[Resumen ejecutivo]*'
-        
-        return text if text else "Análisis completado. Datos listos para visualización."
-        
-    except Exception as e:
-        return f"⚠️ Error en análisis IA: {str(e)[:100]}"
+- Correlaciones clave: {correlations}
 
+- ML:
+{ml_result if ml_result else "No aplicable"}
+
+====================
+🚨 REGLAS
+====================
+- Máx 5 insights
+- Nada genérico
+- Nada inventado
+- Si no hay contexto suficiente → dilo
+
+====================
+📊 OUTPUT
+====================
+
+### 🚀 Insight Principal
+
+### 🧠 Resumen Ejecutivo
+
+### 🔍 Insights Clave
+- Qué pasa
+- Por qué pasa
+- Impacto
+
+### ⚠️ Riesgos
+
+### 💡 Recomendaciones
+
+====================
+
+Pensá como si esto fuera para un CEO.
+"""
+
+    response = model.generate_content(prompt)
+    return response.text
