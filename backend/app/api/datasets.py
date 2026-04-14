@@ -183,9 +183,19 @@ def run_analysis_pipeline(file_id: str, file_path: str):
 
         logger.info(f"Dataset processed successfully. Shape: {result.get('summary', {}).get('total_rows')} rows")
 
-        # 2. Generar insights de negocio
+        # === DEBUG FUERTE - INSIGHTS ===
+        logger.info("=== INICIANDO GENERACIÓN DE INSIGHTS ===")
         insights = generate_business_insights(result)
+        
+        logger.info(f"Tipo de insights: {type(insights)}")
+        logger.info(f"Longitud del texto: {len(insights) if isinstance(insights, str) else 'No es string'}")
+        if isinstance(insights, str) and len(insights) > 100:
+            logger.info(f"Primeros 300 caracteres: {insights[:300]}...")
+        else:
+            logger.info(f"Contenido completo: {insights}")
+        
         result["business_insights"] = insights
+        logger.info("=== FIN DE GENERACIÓN DE INSIGHTS ===")
 
         # 3. Guardar resultado
         analysis.status = "completed"

@@ -1,108 +1,81 @@
 ﻿import os
-import json
 import logging
 from typing import Dict, Any
 
 import google.generativeai as genai
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-
 def generate_insights(data: Dict[str, Any]) -> str:
-    """
-    Genera insights de negocio potentes y accionables usando Gemini.
-    Versión optimizada para entregar valor real al CEO.
-    """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        return "❌ Error: GEMINI_API_KEY no configurada en el entorno."
+        return "Error: GEMINI_API_KEY no configurada en el entorno."
 
-    # Extraer toda la información rica del pipeline
     summary = data.get("summary", {})
     column_types = data.get("column_types", {})
-    descriptive_stats = data.get("descriptive_statistics", {})
-    correlations = data.get("correlation_matrix", {})
-    anomalies = data.get("anomaly_detection", {})
     advanced = data.get("advanced_analytics", {})
-    charts = data.get("charts_data", [])
-    sample_data = data.get("sample_data", [])
-
-    total_rows = summary.get("total_rows", 0)
-    data_quality = summary.get("data_quality_score", 0)
-    missing_cells = summary.get("missing_cells", 0)
-
-    # Preparar información clave para el prompt
+    anomalies = data.get("anomaly_detection", {})
+    
     numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
     categorical_cols = [col for col, t in column_types.items() if t != "numeric"]
 
-    churn_info = advanced.get("churn_analysis", {})
-    rfm_info = advanced.get("rfm_segmentation", {})
-    predictions = advanced.get("predictions", {})
-    clustering = advanced.get("clustering", {})
-
     prompt = f"""
-Eres un **Data Analyst Senior** con más de 10 años de experiencia, especializado en generar insights accionables para CEOs y gerentes.
+Eres un **Director de Analytics** con 15 años de experiencia en consultoría estratégica (McKinsey / BCG level). 
 
-Analiza este dataset y genera un análisis de alto nivel estratégico. 
+Tu trabajo es entregar análisis que justifiquen tu sueldo frente a un CEO exigente.
 
-### Información del Dataset:
-- Filas totales: {total_rows}
-- Calidad de datos: {data_quality}%
-- Celdas faltantes: {missing_cells}
-- Columnas numéricas: {numeric_cols[:8]}
-- Columnas categóricas: {categorical_cols[:6]}
+Dataset analizado:
+- {summary.get('total_rows', 0)} registros
+- Calidad de datos: {summary.get('data_quality_score', 0)}%
+- Columnas numéricas: {numeric_cols}
+- Columnas categóricas: {categorical_cols}
+- Anomalías detectadas: {anomalies.get('detected_rows', 0)} ({anomalies.get('ratio', 0)*100:.1f}%)
 
-### Análisis Avanzado Disponible:
-- Detección de Churn: {json.dumps(churn_info, indent=2) if churn_info else "No detectado"}
-- Segmentación RFM: {json.dumps(rfm_info, indent=2) if rfm_info.get("applicable") else "No aplica"}
-- Predicciones: {json.dumps(predictions, indent=2) if predictions.get("applicable") else "No aplicable"}
-- Clustering: {json.dumps(clustering, indent=2) if clustering.get("applicable") else "No aplicable"}
-- Anomalías detectadas: {anomalies.get("detected_rows", 0)} filas ({anomalies.get("ratio", 0)*100:.1f}%)
+Análisis avanzado disponible:
+{advanced}
 
-### Reglas estrictas:
-- Máximo 5 insights principales.
-- **Nunca** describas solo estadísticas. Siempre explica el **impacto en el negocio**.
-- Sé directo, crítico y estratégico.
-- Usa lenguaje de negocio (revenue, rentabilidad, riesgo, oportunidad, retención, etc.).
-- Si no hay suficiente información para un insight sólido, dilo claramente.
-- Prioriza: concentración de revenue, riesgos, oportunidades de crecimiento, segmentación de clientes.
+REGLAS OBLIGATORIAS:
+- No describas estadísticas. Interpreta su significado de negocio.
+- Sé crítico, directo y estratégico.
+- Usa lenguaje ejecutivo: revenue, rentabilidad, riesgo, oportunidad, retención, concentración, etc.
+- Máximo 5 insights potentes.
+- Siempre incluye impacto económico o operativo cuando sea posible.
 
-Devuelve el análisis **exactamente** en este formato:
+Estructura exacta requerida:
 
 ### 🚀 Insight Principal
-[Una frase impactante que resuma el hallazgo más importante]
+(Una sola frase impactante que capture el hallazgo más importante)
 
 ### 🧠 Resumen Ejecutivo
-[2-3 líneas con la visión general del dataset desde perspectiva de negocio]
+(2-3 líneas con la visión de negocio del dataset)
 
 ### 🔍 Insights Clave
-1. **Título del insight**: Qué pasa + Por qué pasa + Impacto en el negocio
-2. **Título del insight**: ...
-( máximo 5 )
+1. **Título claro**: Qué pasa + Por qué pasa + Impacto en el negocio
+2. ...
+(máximo 5)
 
-### ⚠️ Riesgos Identificados
+### ⚠️ Riesgos Críticos
 - Riesgo 1
 - Riesgo 2
 
-### 💡 Recomendaciones Accionables
-- Recomendación 1 (con prioridad)
-- Recomendación 2
-- Recomendación 3
+### 💡 Recomendaciones Estratégicas
+- Acción 1 (prioridad alta)
+- Acción 2
+- Acción 3
 
-Piensa como si estuvieras presentando esto directamente al CEO en una reunión ejecutiva.
+Sé conciso pero profundo. Piensa como si el CEO fuera a tomar decisiones basadas en tu análisis.
 """
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")   # Modelo más estable y rápido
+        model = genai.GenerativeModel("gemini-1.5-flash")
 
         response = model.generate_content(prompt)
-        insights_text = response.text.strip()
+        text = response.text.strip()
 
-        logger.info("Insights generados exitosamente con Gemini")
-        return insights_text
+        logger.info("Insights generados correctamente")
+        return text
 
     except Exception as e:
-        logger.error(f"Error generando insights con Gemini: {e}")
-        return f"❌ Error al generar insights: {str(e)}\n\nPor favor verifica que la API key de Gemini esté correcta y tenga saldo."
+        logger.error(f"Error Gemini: {e}")
+        return f"Error al generar insights: {str(e)}"
