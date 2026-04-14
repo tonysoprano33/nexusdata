@@ -7,7 +7,8 @@ import { TopNavbar } from "@/components/layout/TopNavbar";
 import { KPIGrid } from "@/components/dashboard/KPIGrid";
 import { ChartsGrid } from "@/components/dashboard/ChartsGrid";
 import { AdvancedAnalyticsPanel } from "@/components/dashboard/AdvancedAnalyticsPanel";
-import { ChatDataset } from "@/components/dashboard/ChatDataset"
+import { ChatDataset } from "@/components/dashboard/ChatDataset";
+import { AIInsightsPanel } from "../AIInsightsPanel";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { AnalysisResponse } from "@/types/analysis";
 
@@ -29,7 +30,6 @@ export default function DashboardPage() {
         const { data } = await axios.get(`${API_URL}/api/datasets/${datasetId}`);
         setAnalysis(data);
 
-        // Si está procesando, polling cada 3 segundos
         if (data.status === "processing") {
           setTimeout(fetchAnalysis, 3000);
         }
@@ -54,7 +54,7 @@ export default function DashboardPage() {
 
       <TopNavbar
         sidebarCollapsed={sidebarCollapsed}
-        datasetName={analysis?.result?.summary ? "Dataset Analysis" : "Loading..."}
+        datasetName={result?.summary ? "Dataset Analysis" : "Loading..."}
         datasetStatus={analysis?.status || "processing"}
         onUploadClick={() => router.push("/")}
       />
@@ -103,27 +103,32 @@ export default function DashboardPage() {
           {!loading && !error && analysis?.status === "completed" && result && (
             <div className="space-y-8">
 
-              {/* KPIs */}
+              {/* 1. AI Insights — lo más importante, arriba de todo */}
+              {result.business_insights && (
+                <AIInsightsPanel insights={result.business_insights} />
+              )}
+
+              {/* 2. KPIs */}
               <KPIGrid
                 summary={result.summary}
                 anomaly_detection={result.anomaly_detection}
                 column_types={result.column_types}
               />
 
-              {/* Charts */}
+              {/* 3. Charts */}
               <section>
                 <h2 className="text-xl font-semibold text-white mb-4">Visualizations</h2>
                 <ChartsGrid charts_data={result.charts_data} />
               </section>
 
-              {/* Advanced Analytics */}
+              {/* 4. Advanced Analytics */}
               {result.advanced_analytics && (
                 <section>
                   <AdvancedAnalyticsPanel data={result.advanced_analytics} />
                 </section>
               )}
 
-              {/* Chat */}
+              {/* 5. Chat */}
               <section>
                 <h2 className="text-xl font-semibold text-white mb-4">Ask your data</h2>
                 <ChatDataset datasetId={datasetId} />
