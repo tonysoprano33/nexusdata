@@ -1,8 +1,8 @@
 """
 Análisis avanzados automatizados:
 - Detección de churn
-- Segmentación RFM
-- Predicciones con regresión
+- Segmentación RFM (solo si hay customer_id + fechas reales)
+- Predicciones con regresión (solo si R² > 0.3)
 - Clustering K-means
 """
 
@@ -32,10 +32,6 @@ def _make_serializable(obj):
 
 
 def detect_churn_indicators(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str, Any]:
-    """
-    Detecta indicadores de churn/cancelación automáticamente.
-    Busca columnas típicas: 'churn', 'cancelled', 'active', 'status', etc.
-    """
     result = {
         "detected": False,
         "churn_column": None,
@@ -55,7 +51,6 @@ def detect_churn_indicators(df: pd.DataFrame, column_types: Dict[str, str]) -> D
             if df[col].dtype == 'object' or df[col].nunique() <= 5:
                 value_counts = df[col].value_counts()
                 total = len(df)
-
                 churn_values = ['yes', 'true', '1', 'cancelled', 'churned', 'inactive', 'false']
                 churn_count = 0
 
@@ -90,27 +85,28 @@ def detect_churn_indicators(df: pd.DataFrame, column_types: Dict[str, str]) -> D
 
 def rfm_segmentation(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str, Any]:
     """
-    Segmentación RFM (Recency, Frequency, Monetary) automática.
-    Identifica columnas apropiadas o usa proxies.
+    RFM solo si el dataset tiene customer_id y fechas reales.
+    Sin estos datos, RFM es inventado — no se muestra.
     """
-    result = {
-        "applicable": False,
-        "segments": [],
-        "insights": []
-    }
+    result = {"applicable": False, "segments": [], "insights": []}
+
+    col_names_lower = [c.lower() for c in df.columns]
+    has_customer = any(k in col_names_lower for k in ['customer_id', 'client_id', 'user_id', 'customer'])
+    has_date = any(t == 'datetime' for t in column_types.values())
+
+    if not has_customer or not has_date:
+        result["reason"] = "RFM requiere customer_id y fechas reales — no aplica a este dataset"
+        return result
 
     numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
 
     recency_col = None
-    frequency_col = None
     monetary_col = None
 
     for col in df.columns:
         col_lower = col.lower()
         if any(k in col_lower for k in ['recency', 'last', 'recent', 'days']):
             recency_col = col
-        elif any(k in col_lower for k in ['frequency', 'count', 'orders', 'purchases']):
-            frequency_col = col
         elif any(k in col_lower for k in ['monetary', 'value', 'revenue', 'amount', 'total']):
             monetary_col = col
 
@@ -135,15 +131,10 @@ def rfm_segmentation(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str
                 return "Bajo valor (Bottom 25%)"
 
         segments = monetary_values.apply(segment_customer).value_counts().to_dict()
-        # Convertir explícitamente los counts a int nativo
         segments = {k: int(v) for k, v in segments.items()}
 
         result["segments"] = [
-            {
-                "name": name,
-                "count": count,
-                "percentage": round(count / len(df) * 100, 1)
-            }
+            {"name": name, "count": count, "percentage": round(count / len(df) * 100, 1)}
             for name, count in segments.items()
         ]
 
@@ -162,14 +153,15 @@ def rfm_segmentation(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str
 
 def simple_predictions(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[str, Any]:
     """
-    Predicciones básicas usando regresión lineal.
-    Predice la variable objetivo numérica más importante.
+    Predicciones con regresión lineal.
+    Solo se muestra si R² > 0.3 — debajo de eso es ruido, no información.
     """
     result = {
         "applicable": False,
         "target_column": None,
         "predictions": [],
-        "insights": []
+        "insights": [],
+        "model_info": None
     }
 
     numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
@@ -201,9 +193,24 @@ def simple_predictions(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[s
 
         r2_score = float(model.score(X, y))
 
+        # R² < 0.3 = ruido, no valor predictivo
+        if r2_score < 0.3:
+            result["applicable"] = False
+            result["reason"] = f"R²={round(r2_score, 2)} — correlación insuficiente para predicciones confiables"
+            return result
+
         result["applicable"] = True
         result["target_column"] = target_col
         result["r2_score"] = round(r2_score, 3)
+
+        result["model_info"] = {
+            "type": "Regresión Lineal",
+            "target": target_col,
+            "features": feature_cols,
+            "r2_score": round(r2_score, 3),
+            "r2_percent": round(r2_score * 100, 1),
+            "reliable": r2_score > 0.7
+        }
 
         last_values = X.tail(3).values
         predictions = model.predict(last_values)
@@ -218,17 +225,16 @@ def simple_predictions(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[s
         ]
 
         result["insights"] = [
-            f"Modelo de regresión para '{target_col}'",
-            f"Precisión (R²): {round(r2_score * 100, 1)}%",
-            f"Variables usadas: {', '.join(feature_cols)}",
+            f"Predicción de '{target_col}' usando {', '.join(feature_cols)}",
+            f"Precisión del modelo (R²): {round(r2_score * 100, 1)}%",
         ]
 
         if r2_score > 0.7:
-            result["insights"].append("✅ Alta correlación - predicciones confiables")
-        elif r2_score > 0.4:
-            result["insights"].append("⚠️ Correlación moderada - usar con precaución")
+            result["insights"].append("✅ Alta correlación — predicciones confiables")
+        elif r2_score > 0.5:
+            result["insights"].append("⚠️ Correlación moderada — usar con precaución")
         else:
-            result["insights"].append("❌ Baja correlación - predicciones poco confiables")
+            result["insights"].append("⚠️ Correlación baja — orientativo solamente")
 
     except Exception as e:
         result["insights"].append(f"Error en predicción: {str(e)[:50]}")
@@ -237,14 +243,8 @@ def simple_predictions(df: pd.DataFrame, column_types: Dict[str, str]) -> Dict[s
 
 
 def kmeans_clustering(df: pd.DataFrame, column_types: Dict[str, str], n_clusters: int = 4) -> Dict[str, Any]:
-    """
-    Clustering automático con K-means sobre variables numéricas.
-    """
-    result = {
-        "applicable": False,
-        "clusters": [],
-        "insights": []
-    }
+    """Clustering automático con K-means sobre variables numéricas."""
+    result = {"applicable": False, "clusters": [], "insights": []}
 
     numeric_cols = [col for col, t in column_types.items() if t == 'numeric']
 
@@ -283,8 +283,8 @@ def kmeans_clustering(df: pd.DataFrame, column_types: Dict[str, str], n_clusters
             })
 
         result["insights"] = [
-            f"Clientes segmentados en {n_clusters} grupos automáticamente",
-            f"Grupo más grande: Grupo {int(cluster_counts.idxmax()) + 1} ({int(cluster_counts.max())} clientes)",
+            f"Dataset segmentado en {n_clusters} grupos automáticamente",
+            f"Grupo más grande: Grupo {int(cluster_counts.idxmax()) + 1} ({int(cluster_counts.max())} registros)",
         ]
 
     except Exception as e:
@@ -305,5 +305,4 @@ def run_all_advanced_analytics(df: pd.DataFrame, column_types: Dict[str, str]) -
         "clustering": kmeans_clustering(df, column_types),
         "generated_at": pd.Timestamp.now().isoformat()
     }
-    # Pasada final para garantizar que no quede ningún tipo numpy
     return _make_serializable(result)
