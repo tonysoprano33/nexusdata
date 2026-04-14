@@ -1,9 +1,9 @@
-import json
+﻿import json
 import os
 import logging
 from typing import Dict, List, Any
 
-import google.generativeai as genai
+from groq import Groq
 import pandas as pd
 import numpy as np
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _fallback_chart_recommendations(data_stats: dict) -> List[Dict[str, Any]]:
-    """Fallback inteligente cuando Gemini falla o no está disponible."""
+    """Fallback inteligente cuando Groq falla o no está disponible."""
     column_types = data_stats.get("column_types", {})
     numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
     categorical_cols = [col for col, t in column_types.items() if t == "categorical"]
@@ -24,7 +24,7 @@ def _fallback_chart_recommendations(data_stats: dict) -> List[Dict[str, Any]]:
             "x_column": categorical_cols[0],
             "y_column": numeric_cols[0],
             "title": f"{numeric_cols[0]} por {categorical_cols[0]}",
-            "insight": f"Identifica qué categorías generan más valor en {numeric_cols[0]}",
+            "insight": "Identifica qué categorías generan más valor en la métrica principal",
             "priority": 1
         })
 
@@ -34,71 +34,68 @@ def _fallback_chart_recommendations(data_stats: dict) -> List[Dict[str, Any]]:
             "x_column": "",
             "y_column": numeric_cols[0],
             "title": f"Distribución de {numeric_cols[0]}",
-            "insight": f"Entiende la concentración y valores atípicos de la métrica principal",
+            "insight": "Entiende la concentración y valores atípicos de la métrica",
             "priority": 2
-        })
-
-    if len(numeric_cols) >= 2:
-        recommendations.append({
-            "type": "scatter",
-            "x_column": numeric_cols[0],
-            "y_column": numeric_cols[1],
-            "title": f"Relación entre {numeric_cols[0]} y {numeric_cols[1]}",
-            "insight": f"Analiza si existe correlación o trade-off entre estas métricas",
-            "priority": 3
         })
 
     return recommendations[:4]
 
 
 def generate_chart_recommendations(data_stats: dict, sample_data: dict = None) -> List[Dict[str, Any]]:
-    """Genera recomendaciones de gráficos usando Gemini (con fallback seguro)."""
-    api_key = os.environ.get("GEMINI_API_KEY")
+    """Genera recomendaciones de gráficos usando Groq (con fallback seguro)."""
+    api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        logger.warning("No GEMINI_API_KEY encontrada - usando fallback")
+        logger.warning("No GROQ_API_KEY encontrada - usando fallback")
         return _fallback_chart_recommendations(data_stats)
 
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")   # Modelo correcto para 2026
+        client = Groq(api_key=api_key)
 
         numeric_cols = [col for col, t in data_stats.get("column_types", {}).items() if t == "numeric"]
-        categorical_cols = [col for col, t in data_stats.get("column_types", {}).items() if t != "numeric"]
+        categorical_cols = [col for col, t in data_stats.get("column_types", {}).items() if t != "numeric"]     
 
         prompt = f"""
 Eres un experto en visualización de datos para negocio.
-
 Dataset:
 - Numéricas: {numeric_cols}
 - Categóricas: {categorical_cols}
 
 Genera entre 2 y 4 recomendaciones de gráficos útiles para un ejecutivo.
 Devuelve SOLO un JSON válido con esta estructura:
-
 [
   {{
     "type": "bar|line|scatter|histogram|box|pie",
     "x_column": "nombre_columna_x",
     "y_column": "nombre_columna_y",
-    "title": "Título claro y profesional (máx 8 palabras)",
-    "insight": "Breve insight de negocio (máx 15 palabras)",
+    "title": "Título claro y profesional",
+    "insight": "Breve insight de negocio",
     "priority": 1
   }}
 ]
-
 Usa solo columnas que existan. Prioriza valor de negocio.
 """
 
-        response = model.generate_content(prompt)
-        text = response.text.strip()
-
-        # Limpiar bloques de código
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-
-        recommendations = json.loads(text)
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Eres un experto en BI y visualización de datos. Responde solo con JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        text = completion.choices[0].message.content.strip()
+        data = json.loads(text)
+        
+        # Manejar si el LLM devuelve un objeto con una key o la lista directamente
+        recommendations = data if isinstance(data, list) else data.get('recommendations', [])
+        if not recommendations and isinstance(data, dict):
+            # Intentar encontrar cualquier lista en el dict si falló lo anterior
+            for v in data.values():
+                if isinstance(v, list):
+                    recommendations = v
+                    break
 
         # Validación básica
         valid_recs = []
@@ -112,39 +109,28 @@ Usa solo columnas que existan. Prioriza valor de negocio.
         return valid_recs[:5]
 
     except Exception as e:
-        logger.error(f"Error generando recomendaciones con Gemini: {e}")
+        logger.error(f"Error generando recomendaciones con Groq: {e}")
         return _fallback_chart_recommendations(data_stats)
 
 
 # ====================== FUNCIONES DE PREPARACIÓN ======================
 
 def _safe_convert_to_list(values) -> list:
-    """Convierte valores a lista nativa de forma segura."""
-    if values is None:
-        return []
-    
+    if values is None: return []
     if not pd.api.types.is_numeric_dtype(values):
         values = pd.to_numeric(values, errors='coerce')
-    
     clean_values = pd.Series(values).dropna()
-    
     result = []
     for v in clean_values:
-        if pd.isna(v):
-            continue
-        elif isinstance(v, (np.integer, np.int64, np.int32)):
-            result.append(int(v))
+        if pd.isna(v): continue
+        elif isinstance(v, (np.integer, np.int64, np.int32)): result.append(int(v))
         elif isinstance(v, (np.floating, np.float64, np.float32)):
             result.append(float(v) if not (np.isnan(v) or np.isinf(v)) else None)
-        else:
-            result.append(str(v))
+        else: result.append(str(v))
     return result
 
 
 def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict[str, Any] | None:
-    """
-    Versión limpia y robusta - evita errores de tipo DType.
-    """
     try:
         chart_type = str(recommendation.get('type', 'bar')).lower().strip()
         x_col = recommendation.get('x_column')
@@ -152,8 +138,7 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
 
         if chart_type == 'heatmap':
             numeric_cols = df.select_dtypes(include=['number']).columns.tolist()[:10]
-            if len(numeric_cols) < 2:
-                return None
+            if len(numeric_cols) < 2: return None
             corr_matrix = df[numeric_cols].corr().fillna(0)
             return {
                 'type': 'heatmap',
@@ -164,8 +149,7 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
 
         if chart_type == 'histogram':
             target_col = y_col or x_col
-            if not target_col or target_col not in df.columns:
-                return None
+            if not target_col or target_col not in df.columns: return None
             values = pd.to_numeric(df[target_col], errors='coerce').dropna()
             return {
                 'type': 'histogram',
@@ -175,23 +159,19 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
             }
 
         if chart_type == 'scatter':
-            if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
-                return None
+            if not (x_col and y_col and x_col in df.columns and y_col in df.columns): return None
             df_scatter = df[[x_col, y_col]].apply(pd.to_numeric, errors='coerce').dropna()
-            if df_scatter.empty:
-                return None
+            if df_scatter.empty: return None
             sample = df_scatter.sample(min(600, len(df_scatter)), random_state=42)
             return {
                 'type': 'scatter',
                 'data': sample.values.tolist(),
                 'title': recommendation.get('title', f'{y_col} vs {x_col}'),
-                'x_label': x_col,
-                'y_label': y_col
+                'x_label': x_col, y_label: y_col
             }
 
         if chart_type == 'pie':
-            if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
-                return None
+            if not (x_col and y_col and x_col in df.columns and y_col in df.columns): return None
             grouped = df.groupby(x_col)[y_col].sum().sort_values(ascending=False).head(8)
             return {
                 'type': 'pie',
@@ -201,11 +181,8 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
             }
 
         if chart_type in ['bar', 'line', 'area']:
-            if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
-                return None
-
+            if not (x_col and y_col and x_col in df.columns and y_col in df.columns): return None
             df_clean = df[[x_col, y_col]].copy()
-
             if pd.api.types.is_object_dtype(df_clean[x_col]) or pd.api.types.is_categorical_dtype(df_clean[x_col]) or pd.api.types.is_datetime64_any_dtype(df_clean[x_col]):
                 grouped = df_clean.groupby(x_col)[y_col].mean().sort_values(ascending=False).head(12)
                 labels = [str(x) for x in grouped.index]
@@ -215,47 +192,30 @@ def prepare_chart_data(df: pd.DataFrame, recommendation: Dict[str, Any]) -> Dict
                 grouped = df_clean.groupby('bin')[y_col].mean()
                 labels = [f"{interval.left:.1f}–{interval.right:.1f}" for interval in grouped.index]
                 values = _safe_convert_to_list(grouped.values)
-
             return {
                 'type': chart_type,
-                'x': labels,
-                'y': values,
+                'x': labels, 'y': values,
                 'title': recommendation.get('title', f'{y_col} por {x_col}'),
-                'x_label': x_col,
-                'y_label': y_col
+                'x_label': x_col, 'y_label': y_col
             }
 
         if chart_type == 'box':
-            if not (x_col and y_col and x_col in df.columns and y_col in df.columns):
-                return None
-
+            if not (x_col and y_col and x_col in df.columns and y_col in df.columns): return None
             df_clean = df[[x_col, y_col]].copy()
-
-            if pd.api.types.is_object_dtype(df_clean[x_col]) or pd.api.types.is_string_dtype(df_clean[x_col]):
-                categories = df_clean[x_col].dropna().unique()[:8]
-                data_by_cat = {}
-                for cat in categories:
-                    cat_data = pd.to_numeric(df_clean[df_clean[x_col] == cat][y_col], errors='coerce').dropna()
-                    data_by_cat[str(cat)] = _safe_convert_to_list(cat_data)
-                return {
-                    'type': 'box',
-                    'categories': list(data_by_cat.keys()),
-                    'data': list(data_by_cat.values()),
-                    'title': recommendation.get('title', f'{y_col} por {x_col}'),
-                    'x_label': x_col,
-                    'y_label': y_col
-                }
-            else:
-                values = pd.to_numeric(df_clean[y_col], errors='coerce').dropna()
-                return {
-                    'type': 'box',
-                    'categories': [y_col],
-                    'data': [_safe_convert_to_list(values)],
-                    'title': recommendation.get('title', f'Distribución de {y_col}')
-                }
+            categories = df_clean[x_col].dropna().unique()[:8]
+            data_by_cat = {}
+            for cat in categories:
+                cat_data = pd.to_numeric(df_clean[df_clean[x_col] == cat][y_col], errors='coerce').dropna() 
+                data_by_cat[str(cat)] = _safe_convert_to_list(cat_data)
+            return {
+                'type': 'box',
+                'categories': list(data_by_cat.keys()),
+                'data': list(data_by_cat.values()),
+                'title': recommendation.get('title', f'{y_col} por {x_col}'),
+                'x_label': x_col, 'y_label': y_col
+            }
 
         return None
-
     except Exception as e:
         logger.error(f"Error en prepare_chart_data para tipo '{chart_type}': {e}")
         return None
