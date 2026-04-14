@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import { EnterpriseSidebar } from "@/components/layout/EnterpriseSidebar";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { AnalysisHistory } from "@/components/landing/AnalysisHistory";
-import { Database, Plus, Search, Filter, LayoutGrid, List } from "lucide-react";
+import { Database, Plus, Filter, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { BarChart3 } from "lucide-react";
 
 export default function DatasetsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
