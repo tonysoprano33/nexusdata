@@ -1,9 +1,7 @@
 ﻿"use client";
-import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Card, CardInsight } from "@/components/ui/card";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion} from "framer-motion";
 import { 
   Brain, Sparkles, TrendingUp, AlertTriangle, 
   Lightbulb, CheckCircle2, Cpu, Zap
