@@ -1,4 +1,4 @@
-annotated-doc==0.0.4
+﻿annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
 bcrypt==5.0.0
@@ -72,3 +72,5 @@ uritemplate==4.2.0
 urllib3==2.6.3
 uvicorn==0.44.0
 xlsxwriter==3.2.9
+gunicorn>=22.0.0
+uvicorn[standard]>=0.30.0
