@@ -23,7 +23,7 @@ def _fallback_chart_recommendations(data_stats: dict) -> List[Dict[str, Any]]:
             "x_column": categorical_cols[0],
             "y_column": numeric_cols[0],
             "title": f"{numeric_cols[0]} por {categorical_cols[0]}",
-            "insight": "Identifica qué categorías generan más valor en la métrica principal",
+            "insight": f"Identifica qué {categorical_cols[0]} generan más {numeric_cols[0].lower()}",
             "priority": 1
         })
 
@@ -33,7 +33,7 @@ def _fallback_chart_recommendations(data_stats: dict) -> List[Dict[str, Any]]:
             "x_column": "",
             "y_column": numeric_cols[0],
             "title": f"Distribución de {numeric_cols[0]}",
-            "insight": "Entiende la concentración y valores atípicos de la métrica",
+            "insight": f"Entiende la concentración y valores atípicos de {numeric_cols[0]}",
             "priority": 2
         })
 
@@ -43,7 +43,7 @@ def _fallback_chart_recommendations(data_stats: dict) -> List[Dict[str, Any]]:
             "x_column": numeric_cols[0],
             "y_column": numeric_cols[1],
             "title": f"Relación entre {numeric_cols[0]} y {numeric_cols[1]}",
-            "insight": "Analiza si existe correlación o trade-off entre estas métricas",
+            "insight": f"Analiza si existe correlación o trade-off entre estas métricas clave",
             "priority": 3
         })
 
@@ -72,7 +72,7 @@ Dataset:
 - Categóricas: {categorical_cols}
 
 Genera entre 2 y 4 recomendaciones de gráficos útiles para un ejecutivo.
-Devuelve SOLO un JSON válido con esta estructura:
+Devuelve SOLO un JSON válido con esta estructura exacta:
 
 [
   {{
@@ -85,7 +85,7 @@ Devuelve SOLO un JSON válido con esta estructura:
   }}
 ]
 
-Usa solo columnas que existan. Prioriza valor de negocio.
+Usa solo columnas que existan en el dataset. Prioriza valor de negocio y evita títulos genéricos.
 """
 
         completion = client.chat.completions.create(
@@ -100,7 +100,7 @@ Usa solo columnas que existan. Prioriza valor de negocio.
 
         text = completion.choices[0].message.content.strip()
 
-        # Limpiar si viene con ```json
+        # Limpiar bloques de código si el modelo los agrega
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
@@ -108,8 +108,14 @@ Usa solo columnas que existan. Prioriza valor de negocio.
 
         data = json.loads(text)
 
-        # Manejar diferentes formatos de respuesta
-        recommendations = data if isinstance(data, list) else data.get("recommendations", []) or list(data.values())[0] if isinstance(list(data.values())[0], list) else []
+        # Manejar diferentes formatos de respuesta del modelo
+        recommendations = data if isinstance(data, list) else data.get("recommendations", []) 
+
+        if not recommendations and isinstance(data, dict):
+            for v in data.values():
+                if isinstance(v, list):
+                    recommendations = v
+                    break
 
         # Validación
         valid_recs = []
