@@ -18,3 +18,7 @@ openpyxl
 python-pptx
 reportlab
 pydantic[email]
+httptools
+uvloop
+groq>=0.13.0
+openai>=1.61.0

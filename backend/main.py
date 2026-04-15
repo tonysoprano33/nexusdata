@@ -1,24 +1,33 @@
 ﻿import os
 import sys
+import logging
 from pathlib import Path
 
-# Forzar el path para que encuentre la carpeta 'app' sin importar desde donde se ejecute
+# Configurar logging basico para ver que pasa en Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info("🚀 Iniciando NexusData API...")
+
+# Forzar el path para encontrar la carpeta 'app'
 current_dir = Path(__file__).parent.absolute()
 if str(current_dir) not in sys.path:
     sys.path.append(str(current_dir))
+    logger.info(f"📍 Path agregado: {current_dir}")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import datasets, auth
-from app.db.database import init_db
-import uvicorn
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from app.api import datasets, auth
+    from app.db.database import init_db
+    logger.info("✅ Modulos internos cargados correctamente")
+except Exception as e:
+    logger.error(f"❌ Error cargando modulos internos: {e}")
+    raise
 
-app = FastAPI(title="NexusData AI API", version="1.1.2")
+app = FastAPI(title="NexusData AI API", version="1.1.3")
 
-# CORS Pro para que Vercel no te rebote
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,21 +40,23 @@ app.include_router(datasets.router, prefix="/api/datasets", tags=["Datasets"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
+    logger.info("📡 Ejecutando tareas de startup...")
     try:
         init_db()
-        print("✅ Database initialized successfully")
+        logger.info("✅ Base de datos inicializada")
     except Exception as e:
-        print(f"❌ Database init error: {e}")
+        logger.error(f"❌ Error en init_db: {e}")
 
 @app.get("/")
-def root():
+async def root():
     return {"status": "ok", "service": "NexusData AI", "engine": "Groq Llama 3.3"}
 
 @app.get("/health")
-def health_check():
+async def health_check():
     return {"status": "healthy"}
 
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=port)
