@@ -10,10 +10,11 @@ import { AdvancedAnalyticsPanel } from "@/components/dashboard/AdvancedAnalytics
 import { ChatDataset } from "@/components/dashboard/ChatDataset";
 import { AIInsightsPanel } from "../AIInsightsPanel";
 import { Loader2, AlertCircle, LayoutDashboard, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { AnalysisResponse } from "@/types/analysis";
 import { cn } from "@/lib/utils";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nexusdata-api.onrender.com";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function DashboardPage() {
   const { datasetId } = useParams<{ datasetId: string }>();
