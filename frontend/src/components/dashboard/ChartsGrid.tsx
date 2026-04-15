@@ -1,23 +1,21 @@
-﻿"use client";
-import { ChartContainer } from "@/components/enterprise/ChartContainer";
+"use client";
 import { Card, CardInsight } from "@/components/ui/card";
-import { BarChart3, Database, Info } from "lucide-react";
+import { BarChart3, Info, Activity } from "lucide-react";
 import type { ChartData } from "@/types/analysis";
-import { BoxPlotChart, HeatmapChart, HistogramChart } from "./ComplexCharts";
+import { cn } from "@/lib/utils";
 import { 
   ResponsiveContainer, BarChart as ReBarChart, Bar, LineChart as ReLineChart, Line, AreaChart as ReAreaChart, Area, 
-  PieChart as RePieChart, Pie, Cell, ScatterChart as ReScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend
+  PieChart as RePieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip
 } from "recharts";
 
-const NEURAL_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#10b981'];
+const MONO_COLORS = ['#ffffff', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a'];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#080808]/90 backdrop-blur-xl border border-white/10 p-3 rounded-xl shadow-2xl">
+      <div className="bg-black border border-zinc-800 p-3 rounded-sm shadow-2xl">
         <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-sm font-bold text-white">
-          <span className="text-blue-400 mr-2">Value:</span>
+        <p className="text-sm font-black text-white">
           {payload[0].value.toLocaleString()}
         </p>
       </div>
@@ -29,17 +27,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function ChartsGrid({ charts_data }: { charts_data?: ChartData[] }) {
   if (!charts_data || charts_data.length === 0) {
     return (
-      <Card className="p-20 flex flex-col items-center justify-center opacity-40">
-        <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center mb-6">
-          <BarChart3 className="w-8 h-8 text-zinc-600" />
-        </div>
-        <h3 className="text-xl font-bold text-white uppercase tracking-widest text-xs">Awaiting Neural Visuals</h3>
-      </Card>
+      <div className="py-32 text-center border border-dashed border-zinc-900 rounded-sm">
+        <Activity className="w-8 h-8 text-zinc-800 mx-auto mb-4" />
+        <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">Awaiting Neural Visuals</h3>
+      </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-px bg-zinc-900 border border-zinc-900">
       {charts_data.map((chart, index) => (
         <ChartRenderer key={index} chartData={chart} index={index} />
       ))}
@@ -48,87 +44,67 @@ export function ChartsGrid({ charts_data }: { charts_data?: ChartData[] }) {
 }
 
 function ChartRenderer({ chartData, index }: { chartData: ChartData; index: number }) {
-  const { type, title, insight, x, y, labels, values, data, categories } = chartData;
-  const color = NEURAL_COLORS[index % NEURAL_COLORS.length];
-
+  const { type, title, insight, x, y, labels, values } = chartData;
+  
   const renderChart = () => {
-    const commonProps = {
-       margin: { top: 20, right: 20, left: 0, bottom: 0 }
-    };
+    const data = x?.map((l, i) => ({ name: l, value: y?.[i] || 0 }));
+    const commonProps = { margin: { top: 10, right: 10, left: -20, bottom: 0 } };
 
     switch (type) {
       case 'bar':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <ReBarChart data={x?.map((l, i) => ({ name: l, value: y?.[i] || 0 }))} {...commonProps}>     
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-              <XAxis dataKey="name" stroke="#ffffff10" tick={{ fill: '#555', fontSize: 9 }} hide />
-              <YAxis stroke="#ffffff10" tick={{ fill: '#555', fontSize: 9 }} />
+          <ResponsiveContainer width="100%" height={250}>
+            <ReBarChart data={data} {...commonProps}>     
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+              <XAxis dataKey="name" hide />
+              <YAxis stroke="#27272a" tick={{ fill: '#52525b', fontSize: 10, fontWeight: 'bold' }} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: '#ffffff05' }} />
-              <Bar dataKey="value" fill={color} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="value" fill="#ffffff" radius={[2, 2, 0, 0]} />
             </ReBarChart>
           </ResponsiveContainer>
         );
       case 'line':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <ReLineChart data={x?.map((l, i) => ({ name: l, value: y?.[i] || 0 }))} {...commonProps}>    
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" />
-              <XAxis dataKey="name" stroke="#ffffff10" hide />
-              <YAxis stroke="#ffffff10" tick={{ fill: '#555', fontSize: 9 }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={3} dot={{ fill: color, r: 4, strokeWidth: 0 }} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} />
-            </ReLineChart>
-          </ResponsiveContainer>
-        );
-      case 'area':
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <ReAreaChart data={x?.map((l, i) => ({ name: l, value: y?.[i] || 0 }))} {...commonProps}>    
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" />
+          <ResponsiveContainer width="100%" height={250}>
+            <ReLineChart data={data} {...commonProps}>    
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" />
               <XAxis dataKey="name" hide />
-              <YAxis stroke="#ffffff10" tick={{ fill: '#555', fontSize: 9 }} />
+              <YAxis stroke="#27272a" tick={{ fill: '#52525b', fontSize: 10, fontWeight: 'bold' }} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="value" stroke={color} fill={`url(#gradient-${index})`} fillOpacity={1} strokeWidth={3} />
-              <defs>
-                <linearGradient id={`gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor={color} stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-            </ReAreaChart>
+              <Line type="monotone" dataKey="value" stroke="#ffffff" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#fff' }} />
+            </ReLineChart>
           </ResponsiveContainer>
         );
       case 'pie':
         return (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250}>
             <RePieChart>
-              <Pie data={labels?.map((l, i) => ({ name: l, value: values?.[i] || 0 }))} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                {labels?.map((_, i) => <Cell key={i} fill={NEURAL_COLORS[i % NEURAL_COLORS.length]} stroke="rgba(0,0,0,0.5)" strokeWidth={2} />)}
+              <Pie 
+                data={labels?.map((l, i) => ({ name: l, value: values?.[i] || 0 }))} 
+                cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value"
+              >
+                {labels?.map((_, i) => <Cell key={i} fill={MONO_COLORS[i % MONO_COLORS.length]} stroke="#000" strokeWidth={2} />)}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
             </RePieChart>
           </ResponsiveContainer>
         );
       default:
-        return <div className="h-[300px] flex items-center justify-center text-zinc-600 font-mono text-[10px] uppercase tracking-widest">Processing Visualization...</div>;
+        return <div className="h-[250px] flex items-center justify-center text-zinc-800 font-black text-[9px] uppercase tracking-widest">Protocol Unsupported</div>;
     }
   };
 
   return (
-    <Card className="overflow-visible">
-       <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center">
-                <BarChart3 className={cn("w-5 h-5", index % 2 === 0 ? "text-blue-400" : "text-purple-400")} />
+    <div className="bg-black p-10 space-y-10">
+       <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+             <div className="w-8 h-8 rounded-sm border border-zinc-900 flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-zinc-500" />
              </div>
              <div>
-                <h3 className="text-sm font-black text-white uppercase tracking-widest">{title}</h3>
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Neural Cluster analysis</p>
+                <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">{title}</h3>
+                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-[0.3em] mt-1">Neural Data Map</p>
              </div>
-          </div>
-          <div className="flex items-center gap-1 text-zinc-600">
-             <Info className="w-4 h-4 cursor-help hover:text-white transition-colors" />
           </div>
        </div>
        
@@ -137,10 +113,10 @@ function ChartRenderer({ chartData, index }: { chartData: ChartData; index: numb
        </div>
 
        {insight && (
-         <CardInsight label="Strategic Note" className="mt-8 bg-blue-500/5 border-blue-500/10">
+         <CardInsight label="Neural Note" variant="default" className="mt-6">
             {insight}
          </CardInsight>
        )}
-    </Card>
+    </div>
   );
 }

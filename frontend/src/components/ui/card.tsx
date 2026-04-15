@@ -1,30 +1,20 @@
 ﻿"use client";
 
 import * as React from "react"
-import { motion, HTMLMotionProps } from "framer-motion"
 import { cn } from "@/lib/utils"
-
-interface CardProps extends HTMLMotionProps<"div"> {
-  size?: "default" | "sm"
-  interactive?: boolean
-}
 
 function Card({
   className,
   size = "default",
-  interactive = true,
   ...props
-}: CardProps) {
+}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={interactive ? { y: -4, transition: { duration: 0.2 } } : {}}
+    <div
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card relative flex flex-col gap-4 overflow-hidden rounded-2xl bg-zinc-950/50 p-6 text-sm ring-1 ring-white/[0.08] backdrop-blur-md transition-all duration-300 hover:ring-white/[0.15] hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]",
-        size === "sm" && "gap-3 p-4",
+        "group/card relative flex flex-col gap-4 overflow-hidden rounded-sm bg-black p-6 text-sm ring-1 ring-zinc-900 shadow-none transition-all duration-300 hover:ring-zinc-800",
+        size === "sm" && "gap-2 p-4",
         className
       )}
       {...props}
@@ -36,7 +26,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-header"
-      className={cn("flex flex-col gap-1.5", className)}
+      className={cn("flex flex-col gap-1.5 mb-2", className)}
       {...props}
     />
   )
@@ -47,7 +37,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-semibold text-lg tracking-tight text-white group-data-[size=sm]/card:text-base",
+        "font-bold text-[10px] tracking-[0.2em] text-zinc-500 uppercase",
         className
       )}
       {...props}
@@ -59,17 +49,23 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-zinc-400 font-medium leading-relaxed", className)}
+      className={cn("text-xs text-zinc-400 font-medium leading-relaxed", className)}
       {...props}
     />
   )
 }
 
-function CardInsight({ className, children, label, ...props }: React.ComponentProps<"div"> & { label?: string }) {
+function CardInsight({ className, children, label, variant = "default", ...props }: React.ComponentProps<"div"> & { label?: string, variant?: "default" | "critical" | "success" }) {
+  const variantStyles = {
+    default: "border-zinc-900 bg-zinc-950 text-zinc-300",
+    critical: "border-red-900/30 bg-red-950/10 text-red-400",
+    success: "border-emerald-900/30 bg-emerald-950/10 text-emerald-400",
+  };
+
   return (
-    <div className={cn("mt-2 flex items-center gap-2 rounded-lg bg-blue-500/5 px-3 py-2 border border-blue-500/10", className)} {...props}>
-      {label && <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400/80">{label}:</span>}
-      <div className="text-sm font-semibold text-blue-100">{children}</div>
+    <div className={cn("mt-4 flex flex-col gap-1 rounded border px-3 py-2", variantStyles[variant], className)} {...props}>
+      {label && <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">{label}</span>}
+      <div className="text-[13px] font-semibold tracking-tight leading-relaxed">{children}</div>
     </div>
   )
 }
@@ -89,7 +85,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center pt-4 border-t border-white/[0.05] mt-auto",
+        "flex items-center pt-4 border-t border-zinc-900 mt-auto",
         className
       )}
       {...props}

@@ -1,241 +1,135 @@
 ﻿"use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Search, Loader2, CheckCircle2, XCircle, FileSpreadsheet, BarChart3, Sparkles, Filter, LayoutGrid, List, Trash2, ArrowRight } from "lucide-react";
+import { Clock, Search, Loader2, CheckCircle2, XCircle, FileSpreadsheet, BarChart3, Sparkles, Trash2, ArrowRight, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardInsight } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { AnalysisHistory as AnalysisHistoryType } from "@/types/analysis";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nexusdata-api.onrender.com";
 
-interface AnalysisHistoryProps {
-  hideHeader?: boolean;
-}
-
-export function AnalysisHistory({ hideHeader = false }: AnalysisHistoryProps) {
+export function AnalysisHistory({ hideHeader = false }: { hideHeader?: boolean }) {
   const [history, setHistory] = useState<AnalysisHistoryType[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "processing" | "completed" | "failed">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
-  const fetchHistory = async () => {
-    try {
-      const params = new URLSearchParams();
-      params.set("limit", "24");
-      if (historyStatusFilter !== "all") params.set("status", historyStatusFilter);
-      const { data } = await axios.get(`${API_URL}/api/datasets/?` + params.toString());
-      setHistory(data);
-    } catch (error) {
-      console.error("Error loading history", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set("limit", "24");
+        if (historyStatusFilter !== "all") params.set("status", historyStatusFilter);
+        const { data } = await axios.get(`${API_URL}/api/datasets/?` + params.toString());
+        setHistory(data);
+      } catch (e) { console.error(e); } finally { setLoading(false); }
+    };
     fetchHistory();
   }, [historyStatusFilter]);
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (!confirm("¿Estás seguro de que quieres eliminar este dataset?")) return;
-    
-    try {
-      await axios.delete(`${API_URL}/api/datasets/${id}`);
-      setHistory(prev => prev.filter(item => item.id !== id));
-    } catch (error) {
-      console.error("Error deleting dataset", error);
-      alert("No se pudo eliminar el dataset.");
-    }
-  };
-
   const filteredHistory = useMemo(() => {
-    let result = history;
-    if (searchQuery) {
-      result = result.filter(item => 
-        item.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.id.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    return result;
+    return history.filter(item => 
+      item.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.id.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   }, [history, searchQuery]);
 
   return (
-    <section className="w-full">
-      {!hideHeader && (
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center shadow-lg">
-              <Clock className="h-6 w-6 text-blue-400" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black tracking-tight text-white">Recents Analysis</h2>
-              <p className="text-[13px] text-neutral-500 font-medium">{history.length} datasets stored in cloud</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 p-1.5 bg-neutral-900/50 border border-neutral-800/60 rounded-2xl">
-            {["all", "processing", "completed", "failed"].map((key) => (
-              <Button
-                key={key}
-                size="sm"
-                variant="ghost"
-                onClick={() => { setLoading(true); setHistoryStatusFilter(key as any); }}
-                className={cn(
-                  "capitalize px-4 py-2 rounded-xl text-[12px] font-bold transition-all",
-                  historyStatusFilter === key 
-                    ? "bg-neutral-800 text-white shadow-lg" 
-                    : "text-neutral-500 hover:text-white hover:bg-white/5"   
-                )}
-              >
-                {key}
-              </Button>
-            ))}
-          </div>
+    <div className="w-full space-y-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="flex items-center gap-2 p-1 bg-zinc-950 border border-zinc-900 rounded-sm">
+          {["all", "processing", "completed", "failed"].map((key) => (
+            <button
+              key={key}
+              onClick={() => { setLoading(true); setHistoryStatusFilter(key as any); }}
+              className={cn(
+                "capitalize px-4 py-1.5 rounded-sm text-[9px] font-black uppercase tracking-widest transition-all",
+                historyStatusFilter === key ? "bg-white text-black" : "text-zinc-600 hover:text-white"
+              )}
+            >
+              {key}
+            </button>
+          ))}
         </div>
-      )}
 
-      {/* Search Bar */}
-      {hideHeader && (
-        <div className="relative mb-8 group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 group-focus-within:text-blue-400 transition-colors" />
-          <input 
+        <div className="relative group max-w-sm w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-700 group-focus-within:text-white transition-colors" />
+          <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search in your inventory..."
-            className="w-full bg-neutral-950 border border-neutral-800/50 hover:border-neutral-700/50 pl-12 pr-4 h-12 rounded-2xl text-sm transition-all focus:ring-2 focus:ring-blue-500/10 outline-none"
+            placeholder="FILTER BY MANIFEST ID..."
+            className="w-full bg-black border border-zinc-900 pl-10 pr-4 h-10 text-[10px] font-black uppercase tracking-widest outline-none focus:border-zinc-700 transition-all"
           />
         </div>
-      )}
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-zinc-900 border border-zinc-900">
         <AnimatePresence mode="popLayout">
           {loading ? (
-            Array(6).fill(0).map((_, i) => (
-              <Card key={i} className="bg-[#0f0f0f] border-neutral-800/60 p-6 rounded-3xl space-y-5 shadow-xl">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-5 w-3/4 bg-white/5 rounded-lg" />
-                    <Skeleton className="h-3 w-1/3 bg-white/5 rounded-lg" />
-                  </div>
-                  <Skeleton className="h-7 w-20 bg-white/5 rounded-lg" />
-                </div>
-                <div className="pt-5 border-t border-white/5 grid grid-cols-2 gap-4">
-                  <Skeleton className="h-10 bg-white/5 rounded-xl" />
-                  <Skeleton className="h-10 bg-white/5 rounded-xl" />
-                </div>
-              </Card>
-            ))
-          ) : filteredHistory.length === 0 ? (
-            <div className="col-span-full py-20 text-center bg-[#0f0f0f] border border-neutral-800/60 border-dashed rounded-[3rem]">
-              <Search className="h-12 w-12 text-neutral-800 mx-auto mb-4" />
-              <p className="text-neutral-500 font-bold text-lg">No results found</p>
-              <p className="text-neutral-600 text-sm mt-1">Try a different search query or filter.</p>
-            </div>
-          ) : (
-            filteredHistory.map((item, index) => (
-              <AnalysisCard
-                key={item.id}
-                item={item}
-                index={index}
-                onClick={() => router.push(`/dashboard/${item.id}`)}
-                onDelete={(e) => handleDelete(e, item.id)}
-              />
-            ))
-          )}
+            Array(6).fill(0).map((_, i) => <div key={i} className="bg-black h-64 animate-pulse" />)
+          ) : filteredHistory.map((item, index) => (
+            <AnalysisCard
+              key={item.id}
+              item={item}
+              onClick={() => router.push(`/dashboard/${item.id}`)}
+            />
+          ))}
         </AnimatePresence>
       </div>
-    </section>
+    </div>
   );
 }
 
-function AnalysisCard({ item, index, onClick, onDelete }: { item: AnalysisHistoryType; index: number; onClick: () => void; onDelete: (e: React.MouseEvent) => void }) {
+function AnalysisCard({ item, onClick }: { item: AnalysisHistoryType; onClick: () => void }) {
   const statusConfig = {
-    processing: { icon: Loader2, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", label: "Analizing", spin: true },
-    completed: { icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", label: "Ready", spin: false },
-    failed: { icon: XCircle, color: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", label: "Failed", spin: false },
+    processing: { color: "text-amber-500", label: "ANALYZING" },
+    completed: { color: "text-emerald-500", label: "READY" },
+    failed: { color: "text-rose-500", label: "FAILED" },
   };
-
   const config = statusConfig[item.status] || statusConfig.processing;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ delay: index * 0.04 }}
-      layout
+    <div 
+      onClick={onClick}
+      className="bg-black p-8 group cursor-pointer hover:bg-zinc-950 transition-colors relative"
     >
-      <Card
-        className="group bg-[#0f0f0f] border-neutral-800/60 hover:border-blue-500/40 transition-all cursor-pointer overflow-hidden relative shadow-xl rounded-3xl"
-        onClick={onClick}
-      >
-        <div className={cn(
-          "h-1.5 w-full opacity-30 group-hover:opacity-100 transition-opacity",
-          item.status === "completed" ? "bg-emerald-500" : item.status === "processing" ? "bg-amber-500" : "bg-rose-500"
-        )} />
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-1.5">
-                <div className="p-2 rounded-xl bg-neutral-900 border border-neutral-800/50 group-hover:bg-neutral-800 transition-colors">
-                  <FileSpreadsheet className="h-5 w-5 text-neutral-400" />
-                </div>
-                <p className="text-[15px] font-black text-white truncate group-hover:text-blue-400 transition-colors leading-tight">
-                  {item.filename}
-                </p>
-              </div>
-              <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest ml-12">
-                {item.created_at ? new Date(item.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short' }) : "No Date"}
-              </p>
-            </div>
-            <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-lg border", config.bg, config.border)}>
-              <config.icon className={cn("h-3 w-3", config.color, config.spin ? "animate-spin" : "")} />        
-              <span className={cn("text-[9px] font-black uppercase tracking-widest", config.color)}>{config.label}</span>
-            </div>
+      <div className="flex items-start justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-sm border border-zinc-900 flex items-center justify-center bg-zinc-950 group-hover:bg-white group-hover:text-black transition-all">
+            <FileSpreadsheet className="w-5 h-5" />
           </div>
-
-          {item.status === "completed" && (
-            <div className="grid grid-cols-2 gap-4 mt-4 pt-5 border-t border-white/[0.04]">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-3.5 w-3.5 text-blue-500" />
-                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Records</span>
-                </div>
-                <p className="text-sm font-black text-white ml-5.5 tracking-tight">{item.summary?.total_rows?.toLocaleString() || "-"}</p>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Quality</span>
-                </div>
-                <p className="text-sm font-black text-emerald-400 ml-5.5 tracking-tight">{item.data_quality_score ?? "-"}%</p>       
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6 flex items-center justify-between">
-             <Button
-                variant="ghost"
-                size="icon"
-                onClick={onDelete}
-                className="h-9 w-9 rounded-xl text-neutral-600 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
-             >
-                <Trash2 className="w-4.5 h-4.5" />
-             </Button>
-             
-             <div className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center group-hover:bg-blue-600 group-hover:border-blue-500 transition-all">
-                <ArrowRight className="w-4 h-4 text-neutral-600 group-hover:text-white" />
-             </div>
+          <div className="truncate max-w-[180px]">
+            <h4 className="text-sm font-black uppercase tracking-tighter truncate text-white">{item.filename}</h4>
+            <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mt-1">ID: {item.id.slice(0,12)}</p>
           </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+        </div>
+        <div className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-1 border border-zinc-900 rounded-sm", config.color)}>
+          {config.label}
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+           <div className="space-y-1">
+              <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Records</span>
+              <p className="text-xl font-black text-zinc-300">{item.summary?.total_rows?.toLocaleString() || "-"}</p>
+           </div>
+           <div className="space-y-1">
+              <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Quality</span>
+              <p className="text-xl font-black text-emerald-500">{item.data_quality_score ?? "-"}%</p>
+           </div>
+        </div>
+        
+        <div className="pt-6 border-t border-zinc-900/50 flex items-center justify-between">
+           <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">{new Date(item.created_at).toLocaleDateString()}</span>
+           <ArrowRight className="w-4 h-4 text-zinc-800 group-hover:text-white group-hover:translate-x-1 transition-all" />
+        </div>
+      </div>
+    </div>
   );
 }

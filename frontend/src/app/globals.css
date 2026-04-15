@@ -1,22 +1,21 @@
 ﻿@import "tailwindcss";
 
 @theme {
-  --color-background: #030303;
+  --color-background: #000000;
   --color-foreground: #ffffff;
-  --color-card: #09090b;
-  --color-card-foreground: #fafafa;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-primary: #3b82f6;
-  --color-primary-foreground: #ffffff;
-  --color-muted: #18181b;
-  --color-muted-foreground: #a1a1aa;
-  --color-accent: #27272a;
-  --color-accent-foreground: #fafafa;
+  --color-card: #000000;
+  --color-card-foreground: #ffffff;
+  --color-border: #18181b; /* Zinc-900 */
+  --color-primary: #ffffff;
+  --color-primary-foreground: #000000;
+  --color-muted: #09090b;
+  --color-muted-foreground: #71717a;
+  --color-accent: #09090b;
+  --color-accent-foreground: #ffffff;
   
-  --radius-xl: 1rem;
-  --radius-lg: 0.75rem;
-  --radius-md: 0.5rem;
-  --radius-sm: 0.25rem;
+  --radius-xl: 0.25rem; /* Casi cuadrado para look profesional */
+  --radius-lg: 0.25rem;
+  --radius-md: 0.125rem;
 }
 
 :root {
@@ -29,30 +28,14 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
-.glass {
-  background: rgba(10, 10, 10, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+/* Data Table Reset */
+.data-table-header {
+  @apply text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 py-3 border-b border-zinc-900;
 }
 
-.glow-border {
-  position: relative;
-}
-
-.glow-border::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.2), transparent, rgba(59, 130, 246, 0.1));
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.glow-border:hover::after {
-  opacity: 1;
+.data-table-cell {
+  @apply py-4 border-b border-zinc-900/50 text-sm font-medium text-zinc-300;
 }
