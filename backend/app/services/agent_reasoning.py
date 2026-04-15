@@ -2,34 +2,32 @@
 import logging
 from typing import Dict, Any
 
-from groq import Groq
-
 logger = logging.getLogger(__name__)
-
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
 def generate_insights(data: Dict[str, Any]) -> str:
     """
-    Genera insights de negocio potentes usando Groq (Llama 3.3 70B).
-    Versión optimizada para entregar valor real.
+    Genera insights de negocio usando Groq (Llama 3.3 70B).
+    Importamos Groq dentro de la función para mayor robustez.
     """
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         return "Error: GROQ_API_KEY no está configurada en Render."
 
     try:
+        # Importamos Groq aquí dentro para evitar errores de importación al iniciar
+        from groq import Groq
+        client = Groq(api_key=api_key)
+
         summary = data.get("summary", {})
-        column_types = data.get("column_types", {})
         advanced = data.get("advanced_analytics", {})
         anomalies = data.get("anomaly_detection", {})
-        charts = data.get("charts_data", [])
 
-        numeric_cols = [col for col, t in column_types.items() if t == "numeric"]
-        categorical_cols = [col for col, t in column_types.items() if t != "numeric"]
+        numeric_cols = [col for col, t in data.get("column_types", {}).items() if t == "numeric"]
+        categorical_cols = [col for col, t in data.get("column_types", {}).items() if t != "numeric"]
 
         prompt = f"""
-Eres un **Director de Analytics** con experiencia en McKinsey/BCG. 
+Eres un Director de Analytics senior con experiencia en McKinsey/BCG. 
 Tu trabajo es entregar insights claros, críticos y accionables para un CEO.
 
 ### Información del Dataset:
@@ -78,22 +76,24 @@ Piensa como si el CEO fuera a tomar decisiones basadas en tu reporte.
                 {"role": "system", "content": "Eres un analista senior de negocio extremadamente directo y estratégico."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.65,
-            max_tokens=1200,
+            temperature=0.7,
+            max_tokens=1100,
             top_p=0.95
         )
 
         insights_text = completion.choices[0].message.content.strip()
-        logger.info("Insights generados correctamente con Groq")
+        logger.info("✅ Insights generados correctamente con Groq")
         return insights_text
 
+    except ImportError:
+        return "Error: Paquete 'groq' no instalado. Verifica requirements.txt y redeploy."
     except Exception as e:
         logger.error(f"Error con Groq: {str(e)}")
         return f"Error al generar insights con Groq: {str(e)[:250]}"
 
 
-# Mantengo las funciones antiguas por si las usás en otro lado
-def detect_target(df: pd.DataFrame):
+# Funciones auxiliares (mantener si las usás en otro lado)
+def detect_target(df):
     for col in df.columns:
         if col.lower() in ["churn", "target", "label", "outcome"]:
             return col
@@ -101,11 +101,3 @@ def detect_target(df: pd.DataFrame):
         if df[col].nunique() == 2:
             return col
     return None
-
-
-def run_ml(df: pd.DataFrame, target_col: str):
-    try:
-        # ... tu código actual de run_ml ...
-        pass
-    except Exception:
-        return None
