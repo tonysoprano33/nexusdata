@@ -91,12 +91,10 @@ async def upload_dataset(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    # Validar extensión
     valid_extensions = (".csv", ".xlsx", ".xls", ".json")
     if not any(file.filename.endswith(ext) for ext in valid_extensions):
         raise HTTPException(status_code=400, detail="Unsupported file format.")
 
-    # Leer y validar tamaño
     content = await file.read()
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
@@ -111,13 +109,10 @@ async def upload_dataset(
         with open(file_path, "wb") as buffer:
             buffer.write(content)
 
-        # Guardar registro inicial
         db.add(DatasetAnalysis(id=file_id, filename=file.filename, status="processing"))
         db.commit()
 
         logger.info(f"Dataset uploaded: {file_id} ({file.filename})")
-
-        # Procesar en background
         background_tasks.add_task(run_analysis_pipeline, file_id, file_path)
 
         return {
@@ -147,22 +142,6 @@ async def get_analysis(file_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.delete("/{file_id}")
-async def delete_analysis(file_id: str, db: Session = Depends(get_db)):
-    analysis = db.get(DatasetAnalysis, file_id)
-    if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found.")
-
-    try:
-        db.delete(analysis)
-        db.commit()
-        logger.info(f"Deleted dataset: {file_id}")
-        return {"message": "Dataset deleted successfully", "id": file_id}
-    except Exception as e:
-        logger.error(f"Delete error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete dataset")
-
-
 def run_analysis_pipeline(file_id: str, file_path: str):
     """Pipeline principal de análisis - se ejecuta en background."""
     db = SessionLocal()
@@ -176,28 +155,29 @@ def run_analysis_pipeline(file_id: str, file_path: str):
 
         logger.info(f"Starting analysis pipeline for {file_id}")
 
-        # 1. Procesar el dataset
+        # Procesar el dataset
         result = process_dataset(file_path)
         if result is None:
             raise ValueError("process_dataset returned None")
 
         logger.info(f"Dataset processed successfully. Shape: {result.get('summary', {}).get('total_rows')} rows")
 
-        # === DEBUG FUERTE - INSIGHTS ===
+        # === GENERACIÓN DE INSIGHTS ===
         logger.info("=== INICIANDO GENERACIÓN DE INSIGHTS ===")
+        
         insights = generate_business_insights(result)
         
         logger.info(f"Tipo de insights: {type(insights)}")
-        logger.info(f"Longitud del texto: {len(insights) if isinstance(insights, str) else 'No es string'}")
-        if isinstance(insights, str) and len(insights) > 100:
-            logger.info(f"Primeros 300 caracteres: {insights[:300]}...")
+        if isinstance(insights, str):
+            logger.info(f"Longitud: {len(insights)} caracteres")
+            logger.info(f"Primeros 400 caracteres: {insights[:400]}...")
         else:
-            logger.info(f"Contenido completo: {insights}")
-        
+            logger.info(f"Contenido: {insights}")
+
         result["business_insights"] = insights
         logger.info("=== FIN DE GENERACIÓN DE INSIGHTS ===")
 
-        # 3. Guardar resultado
+        # Guardar resultado
         analysis.status = "completed"
         analysis.analysis_result = make_json_serializable(result)
         analysis.error = None
