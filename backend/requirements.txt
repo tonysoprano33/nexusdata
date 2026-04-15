@@ -1,5 +1,6 @@
 ﻿fastapi
 uvicorn
+gunicorn
 pandas
 numpy
 scikit-learn
@@ -8,14 +9,12 @@ sqlalchemy
 psycopg2-binary
 pydantic
 pydantic-settings
-google-generativeai
+groq
 openai
 python-jose[cryptography]
 passlib[bcrypt]
 python-dotenv
 openpyxl
 python-pptx
-pydantic[email]
-
 reportlab
-groq
+pydantic[email]
