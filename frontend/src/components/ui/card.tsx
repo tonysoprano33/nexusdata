@@ -1,18 +1,30 @@
-import * as React from "react"
+﻿"use client";
 
+import * as React from "react"
+import { motion, HTMLMotionProps } from "framer-motion"
 import { cn } from "@/lib/utils"
+
+interface CardProps extends HTMLMotionProps<"div"> {
+  size?: "default" | "sm"
+  interactive?: boolean
+}
 
 function Card({
   className,
   size = "default",
+  interactive = true,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: CardProps) {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={interactive ? { y: -4, transition: { duration: 0.2 } } : {}}
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card relative flex flex-col gap-4 overflow-hidden rounded-2xl bg-zinc-950/50 p-6 text-sm ring-1 ring-white/[0.08] backdrop-blur-md transition-all duration-300 hover:ring-white/[0.15] hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]",
+        size === "sm" && "gap-3 p-4",
         className
       )}
       {...props}
@@ -24,10 +36,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-header"
-      className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-4 group-data-[size=sm]/card:px-3 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-4 group-data-[size=sm]/card:[.border-b]:pb-3",
-        className
-      )}
+      className={cn("flex flex-col gap-1.5", className)}
       {...props}
     />
   )
@@ -38,7 +47,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        "font-semibold text-lg tracking-tight text-white group-data-[size=sm]/card:text-base",
         className
       )}
       {...props}
@@ -50,22 +59,18 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("text-sm text-zinc-400 font-medium leading-relaxed", className)}
       {...props}
     />
   )
 }
 
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
+function CardInsight({ className, children, label, ...props }: React.ComponentProps<"div"> & { label?: string }) {
   return (
-    <div
-      data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
-      {...props}
-    />
+    <div className={cn("mt-2 flex items-center gap-2 rounded-lg bg-blue-500/5 px-3 py-2 border border-blue-500/10", className)} {...props}>
+      {label && <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400/80">{label}:</span>}
+      <div className="text-sm font-semibold text-blue-100">{children}</div>
+    </div>
   )
 }
 
@@ -73,7 +78,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-content"
-      className={cn("px-4 group-data-[size=sm]/card:px-3", className)}
+      className={cn("relative z-10", className)}
       {...props}
     />
   )
@@ -84,7 +89,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-4 group-data-[size=sm]/card:p-3",
+        "flex items-center pt-4 border-t border-white/[0.05] mt-auto",
         className
       )}
       {...props}
@@ -97,7 +102,7 @@ export {
   CardHeader,
   CardFooter,
   CardTitle,
-  CardAction,
   CardDescription,
   CardContent,
+  CardInsight
 }

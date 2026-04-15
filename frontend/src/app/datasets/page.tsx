@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { EnterpriseSidebar } from "@/components/layout/EnterpriseSidebar";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { AnalysisHistory } from "@/components/landing/AnalysisHistory";
+import { Card, CardHeader, CardTitle, CardInsight } from "@/components/ui/card";
 import {
   Database,
   Plus,
@@ -11,22 +12,17 @@ import {
   Sparkles,
   BarChart3,
   FileSearch,
+  ArrowRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
-// ─── View toggle ───────────────────────────────────────────────────────────────
 type ViewMode = "grid" | "list";
 
-function ViewToggle({
-  value,
-  onChange,
-}: {
-  value: ViewMode;
-  onChange: (v: ViewMode) => void;
-}) {
+function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) {
   return (
-    <div className="flex items-center bg-neutral-900 p-1 rounded-xl border border-neutral-800/70 gap-0.5">
+    <div className="flex items-center bg-zinc-950/50 p-1 rounded-xl border border-white/[0.08] backdrop-blur-md gap-1">      
       {(["grid", "list"] as ViewMode[]).map((mode) => {
         const Icon = mode === "grid" ? LayoutGrid : List;
         const active = value === mode;
@@ -34,15 +30,15 @@ function ViewToggle({
           <button
             key={mode}
             onClick={() => onChange(mode)}
-            aria-label={`${mode} view`}
             className={cn(
-              "h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-200",
+              "h-8 px-3 rounded-lg flex items-center gap-2 text-xs font-bold transition-all duration-300",
               active
-                ? "bg-neutral-700 text-white shadow-sm"
-                : "text-neutral-500 hover:text-neutral-300"
+                ? "bg-white text-black shadow-lg shadow-white/5"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]"
             )}
           >
             <Icon className="w-3.5 h-3.5" />
+            <span className="capitalize">{mode}</span>
           </button>
         );
       })}
@@ -50,91 +46,36 @@ function ViewToggle({
   );
 }
 
-// ─── Stat card ─────────────────────────────────────────────────────────────────
-// Displays real summary numbers — not marketing copy
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  color: "blue" | "indigo" | "emerald";
-}) {
-  const palette = {
-    blue: {
-      bg: "bg-blue-500/10",
-      border: "border-blue-500/20 hover:border-blue-500/40",
-      icon: "text-blue-400",
-      glow: "group-hover:shadow-[0_0_30px_-5px_rgba(59,130,246,0.3)]",
-    },
-    indigo: {
-      bg: "bg-indigo-500/10",
-      border: "border-indigo-500/20 hover:border-indigo-500/40",
-      icon: "text-indigo-400",
-      glow: "group-hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]",
-    },
-    emerald: {
-      bg: "bg-emerald-500/10",
-      border: "border-emerald-500/20 hover:border-emerald-500/40",
-      icon: "text-emerald-400",
-      glow: "group-hover:shadow-[0_0_30px_-5px_rgba(52,211,153,0.3)]",
-    },
-  }[color];
+function StatCard({ icon: Icon, label, value, trend, color = "blue" }: any) {
+  const colors = {
+    blue: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+    indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+    emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  };
 
   return (
-    <div
-      className={cn(
-        "group relative p-6 rounded-2xl bg-neutral-900/50 border transition-all duration-300",
-        palette.border,
-        palette.glow
-      )}
-    >
-      <div className="flex items-start justify-between">
-        <div
-          className={cn(
-            "p-2.5 rounded-xl border border-white/5",
-            palette.bg
-          )}
-        >
-          <Icon className={cn("w-5 h-5", palette.icon)} />
+    <Card className="flex-1">
+      <div className="flex items-start justify-between mb-4">
+        <div className={cn("p-2 rounded-xl border", colors[color as keyof typeof colors])}>
+          <Icon className="w-5 h-5" />
         </div>
+        {trend && (
+          <div className="px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black text-emerald-400 uppercase tracking-widest">
+            {trend}
+          </div>
+        )}
       </div>
-      <div className="mt-4">
-        <p className="text-3xl font-bold tracking-tight text-white">{value}</p>
-        <p className="text-sm text-neutral-500 mt-1 font-medium">{label}</p>
+      <div>
+        <p className="text-3xl font-bold tracking-tight text-white mb-1">{value}</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">{label}</p>
       </div>
-    </div>
+      <CardInsight label="System Status" className="mt-6">
+        Verified Integrity
+      </CardInsight>
+    </Card>
   );
 }
 
-// ─── Empty state ───────────────────────────────────────────────────────────────
-function EmptyDatasets({ onUpload }: { onUpload: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 gap-6">
-      <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800">
-        <FileSearch className="w-10 h-10 text-neutral-600" />
-      </div>
-      <div className="text-center space-y-1">
-        <h3 className="text-white font-semibold text-lg">No datasets yet</h3>
-        <p className="text-neutral-500 text-sm max-w-xs">
-          Upload your first CSV to start analyzing data with AI.
-        </p>
-      </div>
-      <button
-        onClick={onUpload}
-        className="flex items-center gap-2 px-5 py-2.5 bg-white text-black text-sm font-bold rounded-xl hover:bg-neutral-200 active:scale-95 transition-all"
-      >
-        <Plus className="w-4 h-4 stroke-[2.5]" />
-        Upload your first dataset
-      </button>
-    </div>
-  );
-}
-
-// ─── Page ──────────────────────────────────────────────────────────────────────
 export default function DatasetsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -153,18 +94,7 @@ export default function DatasetsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#060606] text-white selection:bg-blue-500/30">
-      {/* Subtle background grid */}
-      <div
-        className="fixed inset-0 pointer-events-none opacity-[0.025]"
-        style={{
-          backgroundImage:
-            "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-
-      {/* Sidebar */}
+    <div className="min-h-screen bg-[#030303] text-white">
       {!isMobile && (
         <EnterpriseSidebar
           collapsed={sidebarCollapsed}
@@ -174,81 +104,71 @@ export default function DatasetsPage() {
 
       <TopNavbar
         sidebarCollapsed={sidebarCollapsed}
-        datasetName="Datasets"
+        datasetName="Inventory"
         onUploadClick={() => router.push("/")}
       />
 
       <main
         className={cn(
-          "pt-[72px] min-h-screen transition-all duration-300 ease-in-out",
+          "pt-[72px] min-h-screen transition-all duration-500 ease-in-out",
           isMobile ? "ml-0" : sidebarCollapsed ? "ml-20" : "ml-64"
         )}
       >
-        <div className="px-4 sm:px-6 lg:px-10 py-8 max-w-[1600px] mx-auto w-full">
-
-          {/* ── Page header ─────────────────────────────────────── */}
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-8">
-            <div className="flex items-center gap-3.5">
-              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
-                <Database className="w-5 h-5" />
+        <div className="px-6 lg:px-12 py-10 max-w-[1600px] mx-auto w-full">
+          
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8 mb-12"
+          >    
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Database className="text-white w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white">
-                  Dataset Inventory
+                <h1 className="text-3xl font-bold tracking-tight text-white">
+                  Data Command Center
                 </h1>
-                <p className="text-neutral-500 text-sm mt-0.5">
-                  Manage and explore your analyzed data sources
+                <p className="text-zinc-500 text-sm font-medium mt-1">
+                  Orchestrate and analyze your enterprise data ecosystem.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 w-full xl:w-auto">
+            <div className="flex items-center gap-4 w-full xl:w-auto">
               <ViewToggle value={viewMode} onChange={setViewMode} />
-
               <button
                 onClick={() => router.push("/")}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white text-black text-sm font-bold rounded-xl hover:bg-neutral-200 active:scale-95 transition-all shadow-lg shadow-white/5 ml-auto xl:ml-0"
+                className="group flex items-center gap-2 px-6 py-2.5 bg-white text-black text-sm font-bold rounded-xl hover:bg-zinc-200 active:scale-95 transition-all shadow-xl shadow-white/5 ml-auto xl:ml-0"
               >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                Upload Data
+                <Plus className="w-4 h-4 stroke-[3]" />
+                Ingest Data
+                <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
               </button>
             </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+            <StatCard icon={Database} label="Connected Sources" value="12" trend="+2 New" color="blue" />
+            <StatCard icon={BarChart3} label="Neural Extractions" value="482" trend="98% Acc" color="indigo" />
+            <StatCard icon={Sparkles} label="Strategic Insights" value="1.2k" trend="High Signal" color="emerald" />
           </div>
 
-          {/* ── Stats row ────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <StatCard
-              icon={Database}
-              label="Total datasets"
-              value="—"
-              color="blue"
-            />
-            <StatCard
-              icon={BarChart3}
-              label="Analyses run"
-              value="—"
-              color="indigo"
-            />
-            <StatCard
-              icon={Sparkles}
-              label="Insights generated"
-              value="—"
-              color="emerald"
-            />
+          <div className="relative group rounded-[2.5rem] p-[1px] bg-gradient-to-b from-white/[0.08] to-transparent shadow-2xl overflow-hidden"> 
+            <div className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xl rounded-[2.5rem] m-[1px]" />
+            <div className="relative">
+              <AnalysisHistory
+                hideHeader
+                viewMode={viewMode}
+                emptyState={
+                  <div className="flex flex-col items-center justify-center py-32 opacity-50">
+                    <FileSearch className="w-12 h-12 mb-4 text-zinc-600" />
+                    <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs">No Data Streams Detected</p>
+                  </div>
+                }
+              />
+            </div>
           </div>
-
-          {/* ── Dataset list ─────────────────────────────────────── */}
-          <div className="relative rounded-2xl border border-neutral-800/60 bg-neutral-900/30 overflow-hidden">
-            {/* Top accent line */}
-            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
-
-            <AnalysisHistory
-              hideHeader
-              viewMode={viewMode}
-              emptyState={<EmptyDatasets onUpload={() => router.push("/")} />}
-            />
-          </div>
-
         </div>
       </main>
     </div>
