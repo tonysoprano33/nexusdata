@@ -1,175 +1,71 @@
 ﻿"use client";
-
 import { motion } from "framer-motion";
-import { Card } from "@/components/ui/card";
+import { Card, CardInsight } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownRight, Minus, LucideIcon } from "lucide-react";
+import { LucideIcon, Zap } from "lucide-react";
 
 interface KpiCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
   icon: LucideIcon;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
   color: "blue" | "emerald" | "amber" | "rose" | "violet" | "cyan";
   delay?: number;
   className?: string;
 }
-
-const colorVariants = {
-  blue: {
-    bg: "from-blue-500/10 to-blue-600/5",
-    border: "border-blue-500/10 hover:border-blue-500/30",
-    icon: "text-blue-400",
-    iconBg: "bg-blue-500/10",
-    value: "text-white",
-    trend: "text-blue-400",
-    glow: "group-hover:bg-blue-500/5",
-  },
-  emerald: {
-    bg: "from-emerald-500/10 to-emerald-600/5",
-    border: "border-emerald-500/10 hover:border-emerald-500/30",
-    icon: "text-emerald-400",
-    iconBg: "bg-emerald-500/10",
-    value: "text-white",
-    trend: "text-emerald-400",
-    glow: "group-hover:bg-emerald-500/5",
-  },
-  amber: {
-    bg: "from-amber-500/10 to-amber-600/5",
-    border: "border-amber-500/10 hover:border-amber-500/30",
-    icon: "text-amber-400",
-    iconBg: "bg-amber-500/10",
-    value: "text-white",
-    trend: "text-amber-400",
-    glow: "group-hover:bg-amber-500/5",
-  },
-  rose: {
-    bg: "from-rose-500/10 to-rose-600/5",
-    border: "border-rose-500/10 hover:border-rose-500/30",
-    icon: "text-rose-400",
-    iconBg: "bg-rose-500/10",
-    value: "text-white",
-    trend: "text-rose-400",
-    glow: "group-hover:bg-rose-500/5",
-  },
-  violet: {
-    bg: "from-violet-500/10 to-violet-600/5",
-    border: "border-violet-500/10 hover:border-violet-500/30",
-    icon: "text-violet-400",
-    iconBg: "bg-violet-500/10",
-    value: "text-white",
-    trend: "text-violet-400",
-    glow: "group-hover:bg-violet-500/5",
-  },
-  cyan: {
-    bg: "from-cyan-500/10 to-cyan-600/5",
-    border: "border-cyan-500/10 hover:border-cyan-500/30",
-    icon: "text-cyan-400",
-    iconBg: "bg-cyan-500/10",
-    value: "text-white",
-    trend: "text-cyan-400",
-    glow: "group-hover:bg-cyan-500/5",
-  },
-};
 
 export function KpiCard({
   title,
   value,
   subtitle,
   icon: Icon,
-  trend,
-  trendValue,
   color,
   delay = 0,
   className,
 }: KpiCardProps) {
-  const colors = colorVariants[color];
-  const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
+  const colorMap = {
+    blue: "text-blue-400 border-blue-500/20 bg-blue-500/5",
+    emerald: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5",
+    amber: "text-amber-400 border-amber-500/20 bg-amber-500/5",
+    rose: "text-rose-400 border-rose-500/20 bg-rose-500/5",
+    violet: "text-violet-400 border-violet-500/20 bg-violet-500/5",
+    cyan: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5",
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
-      transition={{ 
-        delay, 
-        duration: 0.3, 
-        ease: "easeOut",
-        whileHover: { duration: 0.2 }
-      }}
-      className="h-full"
-    >
-      <Card
-        className={cn(
-          "relative h-full overflow-hidden",
-          "bg-[#0f0f0f] border transition-all duration-300",
-          colors.border,
-          "group cursor-pointer",
-          className
-        )}
-      >
-        {/* Subtle background gradient */}
-        <div className={cn(
-          "absolute inset-0 opacity-20 transition-opacity duration-500",
-          "bg-gradient-to-br",
-          colors.bg,
-          "group-hover:opacity-40"
-        )} />
-
-        <div className="relative p-6 h-full flex flex-col">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest">
-                {title}
-              </p>
-            </div>
-            <div className={cn(
-              "p-2 rounded-lg transition-colors duration-300",
-              colors.iconBg,
-              "group-hover:bg-opacity-20"
-            )}>
-              <Icon className={cn("w-4 h-4", colors.icon)} />
-            </div>
-          </div>
-
-          {/* Value Section */}
-          <div className="mt-auto space-y-1">
-            <div className="flex items-baseline gap-2">
-              <h2 className={cn(
-                "text-4xl font-bold tracking-tight",
-                colors.value
-              )}>
-                {value}
-              </h2>
-              {trend && (
-                <div className={cn(
-                  "flex items-center text-[13px] font-semibold",
-                  colors.trend
-                )}>
-                  <TrendIcon className="w-3.5 h-3.5 mr-0.5" />
-                  {trendValue}
-                </div>
-              )}
-            </div>
-            
-            {subtitle && (
-              <p className="text-[13px] font-medium text-neutral-500 leading-relaxed">
-                {subtitle}
-              </p>
-            )}
-          </div>
-
-          {/* Premium Bottom Accent */}
-          <div className={cn(
-            "absolute bottom-0 left-0 right-0 h-[1.5px] opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-            "bg-gradient-to-r from-transparent via-current to-transparent",
-            colors.icon
-          )} />
+    <Card className={cn("group h-full flex flex-col justify-between", className)}>
+      <div className="flex items-start justify-between mb-8">
+        <div className="space-y-1.5">
+           <div className="flex items-center gap-2">
+             <div className={cn("w-1.5 h-1.5 rounded-full", colorMap[color].split(" ")[0])} />
+             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">{title}</p>
+           </div>
+           <h2 className="text-4xl font-black tracking-tighter text-white">{value}</h2>
         </div>
-      </Card>
-    </motion.div>
+        <div className={cn("p-2.5 rounded-xl border transition-all duration-500 group-hover:scale-110 shadow-lg", colorMap[color])}>
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {subtitle && (
+          <p className="text-xs font-bold text-zinc-500 leading-relaxed uppercase tracking-wider">
+            {subtitle}
+          </p>
+        )}
+        <CardInsight label="Neural Score" className="bg-white/[0.02] border-white/[0.05]">
+           <div className="flex items-center gap-2">
+             <Zap className={cn("w-3 h-3", colorMap[color].split(" ")[0])} />
+             <span className="text-[10px] font-black tracking-widest uppercase">Optimized Integrity</span>
+           </div>
+        </CardInsight>
+      </div>
+      
+      {/* Glow Effect */}
+      <div className={cn(
+        "absolute -bottom-12 -right-12 w-24 h-24 blur-[60px] opacity-0 group-hover:opacity-20 transition-opacity duration-700 pointer-events-none rounded-full",
+        colorMap[color].split(" ")[2]
+      )} />
+    </Card>
   );
 }

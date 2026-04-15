@@ -1,14 +1,12 @@
 ﻿"use client";
-
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardInsight } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Brain, Sparkles, TrendingUp, AlertTriangle, 
-  Lightbulb, CheckCircle2, ChevronDown, ChevronUp 
+  Lightbulb, CheckCircle2, Cpu, Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,109 +30,88 @@ function parseInsights(text: string) {
 
   for (const line of lines) {
     const trimmed = line.trim();
-
     if (trimmed.startsWith("### ")) {
-      if (currentTitle) {
-        sections.push({ title: currentTitle, content: currentContent.join("\n") });
-      }
+      if (currentTitle) sections.push({ title: currentTitle, content: currentContent.join("\n") });
       currentTitle = trimmed.replace("### ", "").trim();
       currentContent = [];
     } else if (trimmed) {
       currentContent.push(trimmed);
     }
   }
-
-  if (currentTitle) {
-    sections.push({ title: currentTitle, content: currentContent.join("\n") });
-  }
-
-  // Fallback si no se parseó nada
-  if (sections.length === 0 && text.trim()) {
-    return [{ title: "AI Business Insights", content: text.trim() }];
-  }
-
+  if (currentTitle) sections.push({ title: currentTitle, content: currentContent.join("\n") });
+  if (sections.length === 0 && text.trim()) return [{ title: "AI Business Strategy", content: text.trim() }];
   return sections;
 }
 
 export function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
-  const [expanded, setExpanded] = useState(true);
-
-  if (!insights || insights.trim() === "") {
-    return null;
-  }
-
-  if (insights.includes("Error")) {
-    return (
-      <Card className="bg-neutral-900 border-rose-500/30 p-6">
-        <p className="text-rose-400 text-sm">{insights}</p>
-      </Card>
-    );
-  }
+  if (!insights || insights.trim() === "") return null;
 
   const sections = parseInsights(insights);
 
   return (
-    <Card className="bg-[#0a0a0a] border-neutral-800 overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-5 border-b border-neutral-800 flex items-center justify-between">
+    <div className="space-y-8">
+      <div className="flex items-center justify-between mb-8 px-2">
         <div className="flex items-center gap-4">
-          <div className="h-9 w-9 bg-blue-500/10 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-blue-400" />
+          <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Sparkles className="w-6 h-6 text-blue-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">AI Business Insights</h2>
-            <p className="text-xs text-neutral-500">Análisis estratégico generado por IA</p>
+            <h3 className="text-xl font-black text-white uppercase tracking-widest">Neural Strategy Engine</h3>
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] mt-1">High-fidelity strategic extraction</p>
           </div>
         </div>
-
-        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
-          Groq • Llama 3.3
-        </Badge>
+        <div className="flex items-center gap-3">
+           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.05]">
+             <Cpu className="w-3.5 h-3.5 text-zinc-500" />
+             <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Llama 3.3 • Groq</span>
+           </div>
+        </div>
       </div>
 
-      <CardContent className="p-6">
-        <AnimatePresence>
-          {expanded && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {sections.map((section, index) => {
+          const lowerTitle = section.title.toLowerCase();
+          let colorClass = "text-blue-400";
+          let bgClass = "bg-blue-500/5 border-blue-500/10";
+          
+          if (lowerTitle.includes("riesgo")) { colorClass = "text-rose-400"; bgClass = "bg-rose-500/5 border-rose-500/10"; }
+          else if (lowerTitle.includes("recomendacion")) { colorClass = "text-emerald-400"; bgClass = "bg-emerald-500/5 border-emerald-500/10"; }
+          else if (lowerTitle.includes("clave")) { colorClass = "text-purple-400"; bgClass = "bg-purple-500/5 border-purple-500/10"; }
+
+          return (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-8"
+              key={index}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+              className={cn("relative p-8 rounded-[2rem] border backdrop-blur-md overflow-hidden", bgClass)}
             >
-              {sections.map((section, index) => {
-                const lowerTitle = section.title.toLowerCase();
-                let icon = SECTION_ICONS["clave"];
-                let color = "text-violet-400";
+              <div className="flex items-center gap-4 mb-6">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border", bgClass)}>
+                   <Zap className={cn("w-5 h-5", colorClass)} />
+                </div>
+                <h4 className={cn("font-black text-sm uppercase tracking-[0.2em]", colorClass)}>
+                  {section.title}
+                </h4>
+              </div>
 
-                if (lowerTitle.includes("principal")) { icon = SECTION_ICONS["principal"]; color = "text-cyan-400"; }
-                else if (lowerTitle.includes("ejecutivo") || lowerTitle.includes("resumen")) { icon = SECTION_ICONS["ejecutivo"]; color = "text-indigo-400"; }
-                else if (lowerTitle.includes("clave")) { icon = SECTION_ICONS["clave"]; color = "text-violet-400"; }
-                else if (lowerTitle.includes("riesgo")) { icon = SECTION_ICONS["riesgos"]; color = "text-amber-400"; }
-                else if (lowerTitle.includes("recomendacion")) { icon = SECTION_ICONS["recomendaciones"]; color = "text-emerald-400"; }
+              <div className="prose prose-invert prose-zinc max-w-none text-zinc-300 text-sm font-medium leading-relaxed">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {section.content}
+                </ReactMarkdown>
+              </div>
 
-                return (
-                  <div key={index} className="border border-neutral-800 rounded-2xl p-6 bg-neutral-900/50">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className={`p-2 rounded-lg bg-neutral-800 ${color.replace("text-", "text-")}`}>
-                        {icon}
-                      </div>
-                      <h3 className={`font-semibold text-lg ${color}`}>
-                        {section.title}
-                      </h3>
-                    </div>
-
-                    <div className="prose prose-invert prose-neutral max-w-none text-neutral-200 leading-relaxed">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {section.content}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                );
-              })}
+              <div className="mt-8 flex justify-end">
+                <div className="flex items-center gap-2 opacity-30">
+                   <div className="w-1 h-1 rounded-full bg-current" />
+                   <span className="text-[9px] font-black uppercase tracking-widest">Verified Insight</span>
+                </div>
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </CardContent>
-    </Card>
+          );
+        })}
+      </div>
+    </div>
   );
 }
