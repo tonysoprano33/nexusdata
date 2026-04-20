@@ -24,7 +24,26 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export function ChartsGrid({ charts_data }: { charts_data?: ChartData[] }) {
+export function ChartsGrid({ charts_data, isProcessing }: { charts_data?: ChartData[], isProcessing?: boolean }) {
+  if (isProcessing) {
+    return (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-px bg-zinc-900 border border-zinc-900">
+         {[1, 2].map((i) => (
+           <div key={i} className="bg-black p-10 space-y-10 animate-pulse">
+              <div className="flex items-center gap-4">
+                 <div className="w-8 h-8 rounded-sm bg-zinc-900" />
+                 <div className="space-y-2">
+                    <div className="w-40 h-4 bg-zinc-800 rounded-sm" />
+                    <div className="w-20 h-2 bg-zinc-900 rounded-sm" />
+                 </div>
+              </div>
+              <div className="w-full h-[250px] bg-zinc-900/50 rounded-lg" />
+           </div>
+         ))}
+      </div>
+    );
+  }
+
   if (!charts_data || charts_data.length === 0) {
     return (
       <div className="py-32 text-center border border-dashed border-zinc-900 rounded-sm">

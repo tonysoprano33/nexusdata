@@ -1,4 +1,7 @@
 ﻿import os
+from dotenv import load_dotenv
+load_dotenv()  # Cargar .env antes de los imports de la app
+import os
 import logging
 
 from fastapi import FastAPI

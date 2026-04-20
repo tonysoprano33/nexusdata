@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Search, Loader2, CheckCircle2, XCircle, FileSpreadsheet, BarChart3, Sparkles, Trash2, ArrowRight, Terminal } from "lucide-react";
@@ -11,7 +11,15 @@ import type { AnalysisHistory as AnalysisHistoryType } from "@/types/analysis";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nexusdata-api.onrender.com";
 
-export function AnalysisHistory({ hideHeader = false }: { hideHeader?: boolean }) {
+export function AnalysisHistory({
+  hideHeader = false,
+  viewMode,
+  emptyState,
+}: {
+  hideHeader?: boolean;
+  viewMode?: "grid" | "list";
+  emptyState?: React.ReactNode;
+}) {
   const [history, setHistory] = useState<AnalysisHistoryType[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "processing" | "completed" | "failed">("all");
@@ -126,7 +134,7 @@ function AnalysisCard({ item, onClick }: { item: AnalysisHistoryType; onClick: (
         </div>
         
         <div className="pt-6 border-t border-zinc-900/50 flex items-center justify-between">
-           <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">{new Date(item.created_at).toLocaleDateString()}</span>
+           <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">{item.created_at ? new Date(item.created_at).toLocaleDateString() : "—"}</span>
            <ArrowRight className="w-4 h-4 text-zinc-800 group-hover:text-white group-hover:translate-x-1 transition-all" />
         </div>
       </div>

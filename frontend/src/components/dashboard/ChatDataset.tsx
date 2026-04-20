@@ -1,5 +1,5 @@
-﻿"use client";
-import { useState } from "react";
+"use client";
+import { useState, useEffect } from "react";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,14 +7,12 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import axios from "axios";
 
-const API_BASE_URL = 'https://nexusdata-api.onrender.com/api';
-
 export function ChatDataset({ datasetId }: { datasetId: string }) {
   const [messages, setMessages] = useState<Array<{id: string; type: 'user' | 'bot'; content: string}>>([]);     
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const sendMessage = async (question: string = input) => {
+  const sendMessage = async (question: string) => {
     if (!question.trim()) return;
     const userMsg = { id: Date.now().toString(), type: 'user' as const, content: question };
     setMessages(prev => [...prev, userMsg]);
@@ -22,14 +20,25 @@ export function ChatDataset({ datasetId }: { datasetId: string }) {
     setLoading(true);
 
     try {
-      const { data } = await axios.post(`https://nexusdata-api.onrender.com/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`);
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: data.answer }]);  
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://nexusdata-api.onrender.com";
+      const { data } = await axios.post(`${API_BASE}/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: data.answer }]);   
     } catch {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: "Error processing your question. Please try again." }]);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const handleQuickAction = (e: any) => {
+        if (e.detail?.prompt) {
+            sendMessage(e.detail.prompt);
+        }
+    };
+    window.addEventListener("quick-analysis", handleQuickAction);
+    return () => window.removeEventListener("quick-analysis", handleQuickAction);
+  }, [datasetId]);
 
   return (
     <Card className="bg-[#141416] border-white/[0.06] h-[500px] flex flex-col shadow-2xl">
@@ -75,11 +84,11 @@ export function ChatDataset({ datasetId }: { datasetId: string }) {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              onKeyPress={(e) => e.key === 'Enter' && sendMessage(input)}
               placeholder="Ask anything..."
               className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
             />
-            <Button size="sm" onClick={() => sendMessage()} disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 h-9 px-4">
+            <Button size="sm" onClick={() => sendMessage(input)} disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 h-9 px-4">
               Send
             </Button>
           </div>
