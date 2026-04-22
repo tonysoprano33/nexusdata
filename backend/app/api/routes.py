@@ -112,3 +112,20 @@ async def list_analyses(limit: int = 100):
     except Exception as e:
         logger.error(f"Error listing analyses: {e}")
         raise HTTPException(status_code=500, detail="Failed to list analyses")
+
+
+# Legacy endpoints for frontend compatibility
+@router.get("/datasets/")
+async def list_datasets_legacy(limit: int = 24):
+    """Legacy endpoint - maps to list_analyses."""
+    return await list_analyses(limit)
+
+
+@router.post("/datasets/upload")
+async def upload_dataset_legacy(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    provider: str = Form("gemini")
+):
+    """Legacy endpoint - maps to analyze_dataset."""
+    return await analyze_dataset(background_tasks, file, provider, None)
