@@ -52,17 +52,59 @@ class AnalysisService:
             if db.client:
                 await db.update_analysis_status(analysis_id, "processing")
             
-            # Perform analysis
-            if provider == "gemini":
-                if not self.gemini.is_available():
-                    raise ValueError("Gemini service not available")
-                result = await self.gemini.analyze_dataset(df, custom_prompt)
-            elif provider == "groq":
-                if not self.groq.is_available():
-                    raise ValueError("Groq service not available")
-                result = await self.groq.analyze_dataset(df, custom_prompt)
-            else:
-                raise ValueError(f"Unknown provider: {provider}")
+            # Perform analysis with fallback
+            result = None
+            fallback_used = False
+            
+            try:
+                if provider == "gemini":
+                    if not self.gemini.is_available():
+                        raise ValueError("Gemini service not available")
+                    result = await self.gemini.analyze_dataset(df, custom_prompt)
+                    
+                    # Check if Gemini returned an error
+                    if result.get("error"):
+                        logger.warning(f"Gemini returned error, trying fallback to Groq: {result['error']}")
+                        if self.groq.is_available():
+                            result = await self.groq.analyze_dataset(df, custom_prompt)
+                            fallback_used = True
+                            
+                elif provider == "groq":
+                    if not self.groq.is_available():
+                        raise ValueError("Groq service not available")
+                    result = await self.groq.analyze_dataset(df, custom_prompt)
+                    
+                    # Check if Groq returned an error
+                    if result.get("error"):
+                        logger.warning(f"Groq returned error, trying fallback to Gemini: {result['error']}")
+                        if self.gemini.is_available():
+                            result = await self.gemini.analyze_dataset(df, custom_prompt)
+                            fallback_used = True
+                else:
+                    raise ValueError(f"Unknown provider: {provider}")
+                
+                # Check if we still have an error after fallback
+                if result.get("error"):
+                    raise ValueError(f"All providers failed. Last error: {result['error']}")
+                
+            except Exception as analysis_error:
+                logger.error(f"Analysis failed with {provider}: {analysis_error}")
+                # Try fallback provider
+                fallback_provider = "groq" if provider == "gemini" else "gemini"
+                try:
+                    if fallback_provider == "gemini" and self.gemini.is_available():
+                        logger.info(f"Trying fallback to Gemini")
+                        result = await self.gemini.analyze_dataset(df, custom_prompt)
+                        fallback_used = True
+                    elif fallback_provider == "groq" and self.groq.is_available():
+                        logger.info(f"Trying fallback to Groq")
+                        result = await self.groq.analyze_dataset(df, custom_prompt)
+                        fallback_used = True
+                    else:
+                        raise analysis_error
+                except Exception as fallback_error:
+                    logger.error(f"Fallback also failed: {fallback_error}")
+                    raise analysis_error
             
             # Update with results (if Supabase configured)
             if db.client:
@@ -72,11 +114,17 @@ class AnalysisService:
                     result
                 )
             
-            return {
+            response = {
                 "id": analysis_id,
                 "status": "completed",
                 "result": result
             }
+            
+            if fallback_used:
+                response["fallback_used"] = True
+                response["original_provider"] = provider
+            
+            return response
             
         except Exception as e:
             logger.error(f"Analysis failed: {e}")

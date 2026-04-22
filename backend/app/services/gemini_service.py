@@ -59,7 +59,14 @@ class GeminiService:
             }
         except Exception as e:
             logger.error(f"Error analyzing with Gemini: {e}")
-            raise
+            # Return graceful fallback
+            return {
+                "insights": f"Analysis could not be completed due to Gemini API error: {str(e)}. Please try again or check your API key.",
+                "summary": summary["description"],
+                "recommendations": ["Verify your Gemini API key is valid", "Check Google AI service status"],
+                "statistics": summary["stats"],
+                "error": str(e)
+            }
     
     def _generate_dataset_summary(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Generate a summary of the dataset."""

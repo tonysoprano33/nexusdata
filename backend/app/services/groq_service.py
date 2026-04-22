@@ -49,7 +49,7 @@ class GroqService:
         
         try:
             response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="llama-3.1-8b-instant",  # Changed to lighter model for reliability
                 messages=[
                     {
                         "role": "system",
@@ -61,7 +61,8 @@ class GroqService:
                     }
                 ],
                 temperature=0.7,
-                max_tokens=4000
+                max_tokens=4000,
+                timeout=30  # Add timeout
             )
             
             analysis_text = response.choices[0].message.content
@@ -74,7 +75,14 @@ class GroqService:
             }
         except Exception as e:
             logger.error(f"Error analyzing with Groq: {e}")
-            raise
+            # Return a graceful fallback instead of crashing
+            return {
+                "insights": f"Analysis could not be completed due to Groq API error: {str(e)}. Please try again with Gemini provider or check your API key.",
+                "summary": summary["description"],
+                "recommendations": ["Try using Gemini provider instead", "Verify your Groq API key is valid", "Check Groq service status"],
+                "statistics": summary["stats"],
+                "error": str(e)
+            }
     
     def _generate_dataset_summary(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Generate a summary of the dataset."""
