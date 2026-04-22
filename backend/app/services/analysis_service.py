@@ -3,7 +3,7 @@ import uuid
 from typing import Optional, Dict, Any
 from app.services.gemini_service import GeminiService
 from app.services.groq_service import GroqService
-from app.db.supabase import supabase_db
+from app.db.supabase import get_supabase_db, supabase_db
 import logging
 import io
 
@@ -26,20 +26,31 @@ class AnalysisService:
     ) -> Dict[str, Any]:
         """Upload a dataset and perform analysis."""
         
+        # Get Supabase instance
+        db = get_supabase_db()
+        
+        # Check if Supabase is configured
+        if not db.client:
+            logger.warning("Supabase not configured, analysis will not be persisted")
+        
         # Generate unique ID
         analysis_id = str(uuid.uuid4())
         
-        # Create record in Supabase
-        record = await supabase_db.create_analysis(analysis_id, filename)
-        if not record:
-            raise ValueError("Failed to create analysis record")
+        # Create record in Supabase (if configured)
+        if db.client:
+            record = await db.create_analysis(analysis_id, filename)
+            if not record:
+                raise ValueError("Failed to create analysis record")
+        else:
+            record = {"id": analysis_id, "filename": filename, "status": "pending"}
         
         try:
             # Parse dataset
             df = self._parse_dataset(file_content, filename)
             
-            # Update status to processing
-            await supabase_db.update_analysis_status(analysis_id, "processing")
+            # Update status to processing (if Supabase configured)
+            if db.client:
+                await db.update_analysis_status(analysis_id, "processing")
             
             # Perform analysis
             if provider == "gemini":
@@ -53,12 +64,13 @@ class AnalysisService:
             else:
                 raise ValueError(f"Unknown provider: {provider}")
             
-            # Update with results
-            await supabase_db.update_analysis_status(
-                analysis_id, 
-                "completed", 
-                result
-            )
+            # Update with results (if Supabase configured)
+            if db.client:
+                await db.update_analysis_status(
+                    analysis_id, 
+                    "completed", 
+                    result
+                )
             
             return {
                 "id": analysis_id,
@@ -68,16 +80,23 @@ class AnalysisService:
             
         except Exception as e:
             logger.error(f"Analysis failed: {e}")
-            await supabase_db.update_analysis_status(analysis_id, "failed")
+            if db.client:
+                await db.update_analysis_status(analysis_id, "failed")
             raise
     
     async def get_analysis(self, analysis_id: str) -> Optional[Dict[str, Any]]:
         """Get analysis by ID."""
-        return await supabase_db.get_analysis(analysis_id)
+        db = get_supabase_db()
+        if not db.client:
+            return None
+        return await db.get_analysis(analysis_id)
     
     async def list_analyses(self, limit: int = 100) -> list:
         """List all analyses."""
-        return await supabase_db.list_analyses(limit)
+        db = get_supabase_db()
+        if not db.client:
+            return []
+        return await db.list_analyses(limit)
     
     def _parse_dataset(self, file_content: bytes, filename: str) -> pd.DataFrame:
         """Parse dataset from file content."""

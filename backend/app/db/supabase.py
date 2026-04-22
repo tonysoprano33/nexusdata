@@ -98,5 +98,15 @@ class SupabaseDB:
             return []
 
 
-# Global instance
-supabase_db = SupabaseDB()
+# Global instance (lazy initialization)
+_supabase_db_instance: Optional[SupabaseDB] = None
+
+def get_supabase_db() -> SupabaseDB:
+    """Get or create SupabaseDB instance."""
+    global _supabase_db_instance
+    if _supabase_db_instance is None:
+        _supabase_db_instance = SupabaseDB()
+    return _supabase_db_instance
+
+# Backwards compatibility
+supabase_db = get_supabase_db()
