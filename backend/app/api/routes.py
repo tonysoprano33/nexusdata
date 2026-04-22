@@ -117,8 +117,14 @@ async def list_analyses(limit: int = 100):
 # Legacy endpoints for frontend compatibility
 @router.get("/datasets/")
 async def list_datasets_legacy(limit: int = 24):
-    """Legacy endpoint - maps to list_analyses."""
-    return await list_analyses(limit)
+    """Legacy endpoint - returns array directly for frontend compatibility."""
+    try:
+        analyses = await analysis_service.list_analyses(limit)
+        # Return array directly, not wrapped in object
+        return analyses if analyses else []
+    except Exception as e:
+        logger.error(f"Error listing datasets: {e}")
+        return []
 
 
 @router.post("/datasets/upload")
