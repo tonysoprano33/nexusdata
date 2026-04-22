@@ -150,3 +150,32 @@ async def upload_dataset_legacy(
 ):
     """Legacy endpoint - maps to analyze_dataset."""
     return await analyze_dataset(background_tasks, file, provider, None)
+
+
+@router.post("/datasets/{dataset_id}/chat")
+async def chat_with_dataset_legacy(
+    dataset_id: str,
+    question: str = Form(...),
+    provider: str = Form("gemini")
+):
+    """Legacy endpoint - chat with dataset analysis results."""
+    try:
+        # Get the analysis result
+        result = await analysis_service.get_analysis(dataset_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Dataset not found")
+        
+        # Return a simple response based on the analysis
+        analysis_data = result.get("analysis_result", {})
+        insights = analysis_data.get("insights", "")
+        
+        return {
+            "answer": f"Based on the analysis: {insights[:500]}..." if len(insights) > 500 else f"Based on the analysis: {insights}",
+            "dataset_id": dataset_id,
+            "question": question
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in chat: {e}")
+        raise HTTPException(status_code=500, detail="Chat failed")
