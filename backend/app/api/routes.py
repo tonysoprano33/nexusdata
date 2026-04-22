@@ -120,8 +120,20 @@ async def list_datasets_legacy(limit: int = 24):
     """Legacy endpoint - returns array directly for frontend compatibility."""
     try:
         analyses = await analysis_service.list_analyses(limit)
-        # Return array directly, not wrapped in object
-        return analyses if analyses else []
+        # Format each item for frontend
+        formatted = []
+        for item in analyses if analyses else []:
+            analysis_result = item.get("analysis_result", {})
+            formatted.append({
+                "id": item.get("id"),
+                "filename": item.get("filename"),
+                "status": item.get("status"),
+                "created_at": item.get("created_at"),
+                "updated_at": item.get("updated_at"),
+                "insights": analysis_result.get("insights", "")[:200] + "..." if len(analysis_result.get("insights", "")) > 200 else analysis_result.get("insights", ""),
+                "summary": analysis_result.get("summary", "")
+            })
+        return formatted
     except Exception as e:
         logger.error(f"Error listing datasets: {e}")
         return []
@@ -129,12 +141,26 @@ async def list_datasets_legacy(limit: int = 24):
 
 @router.get("/datasets/{dataset_id}")
 async def get_dataset_legacy(dataset_id: str):
-    """Legacy endpoint - get dataset by ID."""
+    """Legacy endpoint - get dataset by ID with complete info."""
     try:
         result = await analysis_service.get_analysis(dataset_id)
         if not result:
             raise HTTPException(status_code=404, detail="Dataset not found")
-        return result
+        
+        # Format for frontend
+        analysis_result = result.get("analysis_result", {})
+        
+        return {
+            "id": result.get("id"),
+            "filename": result.get("filename"),
+            "status": result.get("status"),
+            "created_at": result.get("created_at"),
+            "updated_at": result.get("updated_at"),
+            "insights": analysis_result.get("insights", ""),
+            "recommendations": analysis_result.get("recommendations", []),
+            "summary": analysis_result.get("summary", ""),
+            "statistics": analysis_result.get("statistics", {})
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -148,8 +174,53 @@ async def upload_dataset_legacy(
     file: UploadFile = File(...),
     provider: str = Form("gemini")
 ):
-    """Legacy endpoint - maps to analyze_dataset."""
-    return await analyze_dataset(background_tasks, file, provider, None)
+    """Legacy endpoint - upload and analyze dataset with complete response."""
+    # First do the analysis
+    result = await analyze_dataset(background_tasks, file, provider, None)
+    
+    # Read file again for metadata (since analyze_dataset consumed it)
+    await file.seek(0)
+    content = await file.read()
+    
+    # Parse for additional metadata
+    import io
+    import pandas as pd
+    try:
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(content))
+        elif file.filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(content))
+        elif file.filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(content))
+        else:
+            df = pd.DataFrame()
+        
+        # Build enhanced response
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        
+        analysis_result = result.get("result", {})
+        
+        return {
+            "id": result.get("id"),
+            "filename": file.filename,
+            "status": result.get("status"),
+            "columns": df.columns.tolist(),
+            "numeric_columns": numeric_cols,
+            "categorical_columns": categorical_cols,
+            "row_count": len(df),
+            "preview": df.head(10).to_dict(orient='records'),
+            "insights": analysis_result.get("insights", ""),
+            "recommendations": analysis_result.get("recommendations", []),
+            "summary": analysis_result.get("summary", ""),
+            "statistics": analysis_result.get("statistics", {}),
+            "fallback_used": result.get("fallback_used", False),
+            "provider_used": "groq" if result.get("fallback_used") else provider
+        }
+    except Exception as e:
+        logger.error(f"Error building response: {e}")
+        # Return basic result if parsing fails
+        return result
 
 
 @router.post("/datasets/{dataset_id}/chat")
