@@ -11,3 +11,5 @@ python-dotenv==1.0.1
 pydantic==2.6.4
 pydantic-settings==2.2.1
 httpx==0.25.2
+idna==3.10
+httptools==0.6.4
