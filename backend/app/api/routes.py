@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from typing import Optional, List
 from app.services.analysis_service import AnalysisService
@@ -226,8 +226,8 @@ async def upload_dataset_legacy(
 @router.post("/datasets/{dataset_id}/chat")
 async def chat_with_dataset_legacy(
     dataset_id: str,
-    question: str = Form(...),
-    provider: str = Form("gemini")
+    question: str = Query(..., description="Question to ask about the dataset"),
+    provider: str = Query("gemini", description="AI provider to use")
 ):
     """Legacy endpoint - chat with dataset analysis results."""
     try:
