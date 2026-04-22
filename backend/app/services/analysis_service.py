@@ -3,7 +3,7 @@ import uuid
 from typing import Optional, Dict, Any
 from app.services.gemini_service import GeminiService
 from app.services.groq_service import GroqService
-from app.db.supabase import get_supabase_db, supabase_db
+from app.db.supabase import get_supabase_db
 import logging
 import io
 

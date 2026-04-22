@@ -108,5 +108,4 @@ def get_supabase_db() -> SupabaseDB:
         _supabase_db_instance = SupabaseDB()
     return _supabase_db_instance
 
-# Backwards compatibility
-supabase_db = get_supabase_db()
+# Note: Do not create supabase_db here - let it be created lazily via get_supabase_db()
