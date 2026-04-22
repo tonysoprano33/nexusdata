@@ -127,6 +127,21 @@ async def list_datasets_legacy(limit: int = 24):
         return []
 
 
+@router.get("/datasets/{dataset_id}")
+async def get_dataset_legacy(dataset_id: str):
+    """Legacy endpoint - get dataset by ID."""
+    try:
+        result = await analysis_service.get_analysis(dataset_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Dataset not found")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving dataset: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve dataset")
+
+
 @router.post("/datasets/upload")
 async def upload_dataset_legacy(
     background_tasks: BackgroundTasks,
