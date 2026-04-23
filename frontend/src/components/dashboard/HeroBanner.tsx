@@ -20,6 +20,7 @@ export function HeroBanner({
 }: HeroBannerProps) {
   const router = useRouter();
   const minutesSaved = Math.round((totalRows / 500) * 5 + totalColumns * 2);
+  const improvement = qualityAfter - qualityBefore;
 
   return (
     <div className="space-y-6 mb-10">
@@ -46,12 +47,34 @@ export function HeroBanner({
               <p className="text-zinc-500 font-mono text-xs mt-2">{totalRows.toLocaleString()} rows • {totalColumns} columns</p>
             </div>
             
-            <div className="inline-flex items-center gap-3 px-4 py-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
-               <Activity className="w-5 h-5 text-indigo-400" />
-               <p className="text-sm font-black text-indigo-300">~{minutesSaved} min of manual analysis avoided</p>
+            {/* Expanded Stats for Analysts */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="px-3 py-2 rounded-xl bg-zinc-800/50 border border-white/5">
+                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Time Saved</div>
+                <div className="text-lg font-black text-indigo-400">~{minutesSaved}min</div>
+                <div className="text-[9px] text-zinc-600">Manual analysis</div>
+              </div>
+              
+              <div className="px-3 py-2 rounded-xl bg-zinc-800/50 border border-white/5">
+                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Quality</div>
+                <div className="text-lg font-black text-emerald-400">{qualityAfter}%</div>
+                <div className="text-[9px] text-zinc-600">Clean score</div>
+              </div>
+              
+              <div className="px-3 py-2 rounded-xl bg-zinc-800/50 border border-white/5">
+                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Improvement</div>
+                <div className="text-lg font-black text-amber-400">+{improvement}%</div>
+                <div className="text-[9px] text-zinc-600">Data health gain</div>
+              </div>
+              
+              <div className="px-3 py-2 rounded-xl bg-zinc-800/50 border border-white/5">
+                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Dataset</div>
+                <div className="text-lg font-black text-blue-400">{totalColumns}</div>
+                <div className="text-[9px] text-zinc-600">Variables</div>
+              </div>
             </div>
 
-            <div>
+            <div className="flex items-center gap-3">
                <button
                  onClick={() => {
                    window.dispatchEvent(new CustomEvent("switch-to-tab", { detail: { tab: "compare" } }));
@@ -62,6 +85,11 @@ export function HeroBanner({
                  <Eye className="w-4 h-4" />
                  View All Changes
                </button>
+               
+               <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                 <Activity className="w-4 h-4 text-indigo-400" />
+                 <span className="text-xs font-bold text-indigo-300">AI Analysis Complete</span>
+               </div>
             </div>
           </div>
 
@@ -69,7 +97,7 @@ export function HeroBanner({
              <div className="text-center">
                 <p className="text-[10px] font-black uppercase text-zinc-600 tracking-widest mb-1">Health Score</p>
                 <div className="text-4xl font-black text-white">{qualityAfter}%</div>
-                <div className="text-[10px] text-emerald-400 font-bold mt-1">+{qualityAfter - qualityBefore}% gain</div>
+                <div className="text-[10px] text-emerald-400 font-bold mt-1">+{qualityBefore}% → {qualityAfter}%</div>
              </div>
           </div>
         </div>

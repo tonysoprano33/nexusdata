@@ -16,44 +16,134 @@ interface AIInsightsPanelProps {
 
 function parseInsights(text: string) {
   const sections: { title: string; content: string; keyFindings: string[] }[] = [];
-  const lines = text.split("\n");
-  let currentTitle = "";
-  let currentContent: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("### ")) {
-      if (currentTitle) sections.push({ title: currentTitle, content: currentContent.join("\n"), keyFindings: [] });
-      currentTitle = trimmed.replace("### ", "").trim();
-      currentContent = [];
-    } else if (trimmed) {
-      currentContent.push(trimmed);
-    }
-  }
-  if (currentTitle) sections.push({ title: currentTitle, content: currentContent.join("\n"), keyFindings: [] });
-  if (sections.length === 0 && text.trim()) {
-    sections.push({ title: "AI Business Strategy", content: text.trim(), keyFindings: [] });
-  }
-
-  // Extract top findings globally for the scanable block
-  const globalFindings: string[] = [];
-  for (const sec of sections) {
-    const bullets = sec.content.split('\n').filter(l => l.startsWith('- ') || l.startsWith('* '));
-    for (const b of bullets) {
-      const clean = b.replace(/^[-*]\s+/, '').replace(/\*\*/g, '');
-      if (globalFindings.length < 3 && clean.length < 100) {
-        // Pick bullets with numbers or % or $ or specific keywords
-        if (/\d/.test(clean) || /%/.test(clean) || /outlier|missing|risk|impact/i.test(clean)) {
-          globalFindings.push(clean);
-        }
+  
+  // Known section patterns to detect
+  const sectionPatterns = [
+    { pattern: /key insights/i, title: "Key Insights", icon: "TrendingUp" },
+    { pattern: /data.*patterns/i, title: "Data Patterns", icon: "TrendingUp" },
+    { pattern: /notable trends|trends.*correlations/i, title: "Trends & Correlations", icon: "Zap" },
+    { pattern: /data quality.*observations/i, title: "Data Quality", icon: "ShieldCheck" },
+    { pattern: /actionable recommendations|business decisions/i, title: "Recommendations", icon: "Lightbulb" },
+    { pattern: /additional analysis|suggestions/i, title: "Further Analysis", icon: "Brain" },
+    { pattern: /executive summary|summary/i, title: "Executive Summary", icon: "CheckCircle2" },
+    { pattern: /risk|critical|alert/i, title: "Risk Assessment", icon: "AlertTriangle" },
+  ];
+  
+  // First try to split by markdown headers (### ## #)
+  const headerRegex = /^(#{1,3}\s+.+|(?:\*\*)?[^:\n]+:(?:\*\*)?)$/gm;
+  const matches = [...text.matchAll(headerRegex)];
+  
+  if (matches.length >= 2) {
+    // We have headers, use them
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const startIdx = match.index!;
+      const endIdx = i < matches.length - 1 ? matches[i + 1].index! : text.length;
+      const sectionText = text.slice(startIdx, endIdx).trim();
+      
+      const headerLine = match[0].replace(/^#+\s+/, '').replace(/\*\*/g, '').replace(/:$/, '').trim();
+      const content = sectionText.replace(match[0], '').trim();
+      
+      if (headerLine && content) {
+        sections.push({ title: headerLine, content, keyFindings: [] });
       }
     }
   }
   
-  // Si no hay suficientes hallazgos automáticos numéricos, agregamos algunos estáticos basados en el texto para no dejar vacío
+  // If no sections found with headers, try pattern matching
+  if (sections.length === 0) {
+    const lines = text.split('\n');
+    let currentTitle = "";
+    let currentContent: string[] = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      // Check if line looks like a section header
+      const isHeader = sectionPatterns.some(p => p.pattern.test(trimmed)) ||
+                       trimmed.match(/^(?:\*\*)?[^:\n]{3,60}:(?:\*\*)?$/) ||
+                       trimmed.match(/^#{1,3}\s+.+$/);
+      
+      if (isHeader) {
+        if (currentTitle && currentContent.length > 0) {
+          sections.push({ 
+            title: currentTitle, 
+            content: currentContent.join('\n').trim(), 
+            keyFindings: [] 
+          });
+        }
+        currentTitle = trimmed.replace(/^#+\s+/, '').replace(/\*\*/g, '').replace(/:$/, '').trim();
+        currentContent = [];
+      } else if (currentTitle) {
+        currentContent.push(trimmed);
+      }
+    }
+    
+    // Add last section
+    if (currentTitle && currentContent.length > 0) {
+      sections.push({ 
+        title: currentTitle, 
+        content: currentContent.join('\n').trim(), 
+        keyFindings: [] 
+      });
+    }
+  }
+  
+  // If still no sections, create them from the text structure
+  if (sections.length === 0 && text.trim()) {
+    // Try to split by double newlines (paragraph groups)
+    const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 20);
+    if (paragraphs.length >= 2) {
+      sections.push({ 
+        title: "Key Insights About the Data", 
+        content: paragraphs.slice(0, 2).join('\n\n'), 
+        keyFindings: [] 
+      });
+      if (paragraphs.length > 2) {
+        sections.push({ 
+          title: "Trends and Patterns", 
+          content: paragraphs.slice(2, 4).join('\n\n'), 
+          keyFindings: [] 
+        });
+      }
+      if (paragraphs.length > 4) {
+        sections.push({ 
+          title: "Recommendations", 
+          content: paragraphs.slice(4).join('\n\n'), 
+          keyFindings: [] 
+        });
+      }
+    } else {
+      sections.push({ title: "AI Business Strategy", content: text.trim(), keyFindings: [] });
+    }
+  }
+
+  // Extract top findings globally for the scanable block
+  const globalFindings: string[] = [];
+  
+  // Extract numbered findings and key statistics
+  const allLines = text.split('\n');
+  for (const line of allLines) {
+    const trimmed = line.trim();
+    // Look for lines with numbers, percentages, or key metrics
+    const hasMetrics = /\d/.test(trimmed) && (/%|cases|outbreak|correlation|distribution/i.test(trimmed));
+    const isBullet = trimmed.match(/^[-*•]\s+/);
+    const isNumbered = trimmed.match(/^\d+[.)]\s+/);
+    
+    if ((isBullet || isNumbered || hasMetrics) && trimmed.length > 20 && trimmed.length < 150) {
+      const clean = trimmed.replace(/^[-*•\d.)]+\s+/, '').replace(/\*\*/g, '');
+      if (!globalFindings.includes(clean)) {
+        globalFindings.push(clean);
+      }
+    }
+    if (globalFindings.length >= 3) break;
+  }
+  
+  // If no findings, extract first meaningful sentences
   if (globalFindings.length === 0) {
-     const allBullets = text.split('\n').filter(l => l.startsWith('- ') || l.startsWith('* ')).map(l => l.replace(/^[-*]\s+/, '').replace(/\*\*/g, ''));
-     globalFindings.push(...allBullets.slice(0, 3));
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 30 && s.trim().length < 120);
+    globalFindings.push(...sentences.slice(0, 3).map(s => s.trim()));
   }
 
   return { sections, globalFindings };

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, GitMerge, Columns } from "lucide-react";
+import { ArrowLeft, ArrowRight, GitMerge, Columns, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tab = "compare" | "raw" | "clean" | "diff";
@@ -73,6 +73,131 @@ function HeadComparison({ raw = [], clean = [] }: { raw?: any[], clean?: any[] }
   );
 }
 
+// Generate diff between raw and clean data
+function generateDiff(raw: any[], clean: any[]): DiffRow[] {
+  const diff: DiffRow[] = [];
+  const maxRows = Math.min(raw.length, clean.length);
+  
+  for (let i = 0; i < maxRows; i++) {
+    const rawRow = raw[i] || {};
+    const cleanRow = clean[i] || {};
+    const changes: Record<string, DiffChange> = {};
+    const allKeys = new Set([...Object.keys(rawRow), ...Object.keys(cleanRow)]);
+    
+    for (const key of allKeys) {
+      const before = rawRow[key];
+      const after = cleanRow[key];
+      
+      // Check if value changed (handle null/undefined)
+      const beforeStr = before === null || before === undefined ? '' : String(before);
+      const afterStr = after === null || after === undefined ? '' : String(after);
+      
+      if (beforeStr !== afterStr) {
+        changes[key] = { before, after };
+      }
+    }
+    
+    if (Object.keys(changes).length > 0) {
+      diff.push({
+        row: i,
+        changes,
+        raw: rawRow,
+        clean: cleanRow
+      });
+    }
+  }
+  
+  return diff;
+}
+
+function DiffTable({ diff }: { diff: DiffRow[] }) {
+  if (!diff || diff.length === 0) {
+    return (
+      <div className="p-10 text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs font-bold text-emerald-400 uppercase">No Changes in Preview</span>
+        </div>
+        <p className="text-zinc-500 text-xs">The first 10 rows had no cell-level changes. Check the full dataset for structural changes.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto p-4">
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="border-b border-zinc-800">
+            <th className="text-left px-3 py-2 text-[10px] font-black uppercase text-zinc-500">Row</th>
+            <th className="text-left px-3 py-2 text-[10px] font-black uppercase text-zinc-500">Column</th>
+            <th className="text-left px-3 py-2 text-[10px] font-black uppercase text-rose-400">Before</th>
+            <th className="text-left px-3 py-2 text-[10px] font-black uppercase text-emerald-400">After</th>
+            <th className="text-left px-3 py-2 text-[10px] font-black uppercase text-zinc-500">Change Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          {diff.map((row) => 
+            Object.entries(row.changes).map(([col, change], idx) => (
+              <tr key={`${row.row}-${col}`} className="border-b border-zinc-900/50 hover:bg-white/[0.02]">
+                {idx === 0 && (
+                  <td rowSpan={Object.keys(row.changes).length} className="px-3 py-2 text-zinc-400 font-mono">
+                    #{row.row + 1}
+                  </td>
+                )}
+                <td className="px-3 py-2 text-zinc-300 font-medium">{col}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-block px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-mono text-[10px]">
+                    {cellStr(change.before)}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[10px]">
+                    {cellStr(change.after)}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  <ChangeTypeBadge before={change.before} after={change.after} />
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ChangeTypeBadge({ before, after }: { before: unknown; after: unknown }) {
+  const beforeVal = before === null || before === undefined ? null : before;
+  const afterVal = after === null || after === undefined ? null : after;
+  
+  // Detect change type
+  let type = "modified";
+  let color = "text-amber-400 bg-amber-500/10";
+  
+  if (beforeVal === null && afterVal !== null) {
+    type = "filled";
+    color = "text-blue-400 bg-blue-500/10";
+  } else if (beforeVal !== null && afterVal === null) {
+    type = "cleared";
+    color = "text-rose-400 bg-rose-500/10";
+  } else if (typeof beforeVal === 'string' && typeof afterVal === 'string') {
+    // Check for case/whitespace changes
+    const beforeNorm = beforeVal.toLowerCase().trim();
+    const afterNorm = afterVal.toLowerCase().trim();
+    if (beforeNorm === afterNorm) {
+      type = "standardized";
+      color = "text-purple-400 bg-purple-500/10";
+    }
+  }
+  
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase ${color}`}>
+      {type}
+    </span>
+  );
+}
+
 export function DataPreviewTabs({ rawPreview = [], cleanPreview = [], diffPreview = [] }: DataPreviewTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("compare");
 
@@ -82,11 +207,15 @@ export function DataPreviewTabs({ rawPreview = [], cleanPreview = [], diffPrevie
     return () => window.removeEventListener("switch-to-tab", handle);
   }, []);
 
+  // Generate diff if not provided
+  const generatedDiff = diffPreview.length > 0 ? diffPreview : generateDiff(rawPreview, cleanPreview);
+  const totalChanges = generatedDiff.reduce((acc, row) => acc + Object.keys(row.changes).length, 0);
+
   const tabs = [
     { id: "compare", label: "Comparison", icon: Columns },
     { id: "raw", label: "Raw", badge: `${rawPreview.length}` },
     { id: "clean", label: "Clean", badge: `${cleanPreview.length}` },
-    { id: "diff", label: "Changes", badge: `${diffPreview.length}` },
+    { id: "diff", label: "Changes", badge: `${totalChanges}` },
   ];
 
   return (
@@ -105,11 +234,7 @@ export function DataPreviewTabs({ rawPreview = [], cleanPreview = [], diffPrevie
           {activeTab === "compare" && <HeadComparison raw={rawPreview} clean={cleanPreview} />}
           {activeTab === "raw" && <PreviewTable data={rawPreview} />}
           {activeTab === "clean" && <PreviewTable data={cleanPreview} />}
-          {activeTab === "diff" && (
-            <div className="p-10 text-center text-zinc-500 text-xs uppercase font-bold">
-               {diffPreview.length > 0 ? `Detected ${diffPreview.length} changes in current sample` : "No specific cell changes detected"}
-            </div>
-          )}
+          {activeTab === "diff" && <DiffTable diff={diffPreview.length > 0 ? diffPreview : generateDiff(rawPreview, cleanPreview)} />}
         </motion.div>
       </AnimatePresence>
     </div>
