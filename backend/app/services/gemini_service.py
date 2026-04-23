@@ -68,6 +68,19 @@ class GeminiService:
                 "error": str(e)
             }
     
+    def _clean_for_json(self, obj):
+        """Clean NaN/Inf values for JSON serialization."""
+        import math
+        if isinstance(obj, dict):
+            return {k: self._clean_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._clean_for_json(v) for v in obj]
+        elif isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return obj
+        return obj
+    
     def _generate_dataset_summary(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Generate a summary of the dataset."""
         numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
@@ -82,7 +95,9 @@ class GeminiService:
         }
         
         if numeric_cols:
-            stats["numeric_summary"] = df[numeric_cols].describe().to_dict()
+            # Clean NaN/Inf values from describe()
+            describe_dict = df[numeric_cols].describe().to_dict()
+            stats["numeric_summary"] = self._clean_for_json(describe_dict)
         
         description = f"Dataset with {len(df)} rows and {len(df.columns)} columns. "
         description += f"Numeric columns: {len(numeric_cols)}. "

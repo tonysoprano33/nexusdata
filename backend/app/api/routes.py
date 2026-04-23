@@ -240,7 +240,8 @@ async def upload_dataset_legacy(
         
         analysis = result.get("result", {})
         
-        return {
+        # Build response
+        response = {
             "id": result.get("id"),
             "filename": file.filename,
             "status": result.get("status"),
@@ -256,6 +257,23 @@ async def upload_dataset_legacy(
             "fallback_used": result.get("fallback_used", False),
             "provider_used": provider
         }
+        
+        # Clean any NaN/Inf values for JSON
+        def clean_for_json(obj):
+            import math
+            if isinstance(obj, dict):
+                return {k: clean_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [clean_for_json(v) for v in obj]
+            elif isinstance(obj, float):
+                if math.isnan(obj) or math.isinf(obj):
+                    return None
+                return obj
+            return obj
+        
+        clean_response = clean_for_json(response)
+        logger.info(f"Step 5: Response ready with {len(clean_response.get('insights', ''))} chars insights")
+        return clean_response
         
     except HTTPException:
         raise

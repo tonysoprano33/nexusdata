@@ -110,18 +110,21 @@ class AnalysisService:
                     logger.error(f"Fallback also failed: {fallback_error}")
                     raise analysis_error
             
+            # Clean result for JSON serialization
+            clean_result = self._clean_for_json(result)
+            
             # Update with results (if Supabase configured)
             if db.client:
                 await db.update_analysis_status(
                     analysis_id, 
                     "completed", 
-                    result
+                    clean_result
                 )
             
             response = {
                 "id": analysis_id,
                 "status": "completed",
-                "result": result
+                "result": clean_result
             }
             
             if fallback_used:
@@ -151,6 +154,19 @@ class AnalysisService:
         if not db.client:
             return []
         return await db.list_analyses(limit)
+    
+    def _clean_for_json(self, obj):
+        """Clean NaN/Inf values for JSON serialization."""
+        import math
+        if isinstance(obj, dict):
+            return {k: self._clean_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._clean_for_json(v) for v in obj]
+        elif isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return obj
+        return obj
     
     def _parse_dataset(self, file_content: bytes, filename: str) -> pd.DataFrame:
         """Parse dataset from file content."""
