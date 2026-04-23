@@ -6,6 +6,7 @@ from app.services.groq_service import GroqService
 from app.db.supabase import get_supabase_db
 import logging
 import io
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -25,28 +26,31 @@ class AnalysisService:
         custom_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """Upload a dataset and perform analysis."""
+        logger.info(f"[ANALYSIS] Starting upload_and_analyze for {filename} with {provider}")
         
         # Get Supabase instance
         db = get_supabase_db()
-        
-        # Check if Supabase is configured
-        if not db.client:
-            logger.warning("Supabase not configured, analysis will not be persisted")
+        logger.info(f"[ANALYSIS] Supabase client: {db.client is not None}")
         
         # Generate unique ID
         analysis_id = str(uuid.uuid4())
+        logger.info(f"[ANALYSIS] Generated ID: {analysis_id}")
         
         # Create record in Supabase (if configured)
         if db.client:
             record = await db.create_analysis(analysis_id, filename)
             if not record:
                 raise ValueError("Failed to create analysis record")
+            logger.info(f"[ANALYSIS] Supabase record created")
         else:
             record = {"id": analysis_id, "filename": filename, "status": "pending"}
+            logger.info(f"[ANALYSIS] No Supabase, using local record")
         
         try:
             # Parse dataset
+            logger.info(f"[ANALYSIS] Parsing dataset...")
             df = self._parse_dataset(file_content, filename)
+            logger.info(f"[ANALYSIS] Dataset parsed: {len(df)} rows, {len(df.columns)} cols")
             
             # Update status to processing (if Supabase configured)
             if db.client:
@@ -124,10 +128,12 @@ class AnalysisService:
                 response["fallback_used"] = True
                 response["original_provider"] = provider
             
+            logger.info(f"[ANALYSIS] SUCCESS - ID: {analysis_id}, insights length: {len(result.get('insights', ''))}")
             return response
             
         except Exception as e:
-            logger.error(f"Analysis failed: {e}")
+            logger.error(f"[ANALYSIS] FAILED: {e}")
+            logger.error(traceback.format_exc())
             if db.client:
                 await db.update_analysis_status(analysis_id, "failed")
             raise

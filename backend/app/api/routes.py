@@ -175,7 +175,8 @@ async def upload_dataset_legacy(
     provider: str = Form("gemini")
 ):
     """Legacy endpoint - upload and analyze dataset."""
-    logger.info(f"Upload request received: {file.filename}, provider: {provider}")
+    logger.info(f"=== UPLOAD START ===")
+    logger.info(f"File: {file.filename}, Provider: {provider}")
     
     import pandas as pd
     import io
@@ -183,12 +184,14 @@ async def upload_dataset_legacy(
     # Validate file extension
     allowed = ('.csv', '.xlsx', '.xls', '.json')
     if not file.filename.endswith(allowed):
+        logger.error(f"Invalid file extension: {file.filename}")
         raise HTTPException(400, f"File must be: {', '.join(allowed)}")
     
     try:
         # Read file
+        logger.info("Step 1: Reading file...")
         content = await file.read()
-        logger.info(f"File read: {len(content)} bytes")
+        logger.info(f"Step 1 complete: {len(content)} bytes read")
         
         if len(content) == 0:
             raise HTTPException(400, "Empty file")
@@ -197,6 +200,7 @@ async def upload_dataset_legacy(
             raise HTTPException(400, "File too large (max 50MB)")
         
         # Parse dataframe for metadata
+        logger.info("Step 2: Parsing DataFrame...")
         try:
             if file.filename.endswith('.csv'):
                 df = pd.read_csv(io.BytesIO(content))
@@ -213,22 +217,26 @@ async def upload_dataset_legacy(
             categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
             preview = df.head(10).to_dict(orient='records')
             
-            logger.info(f"Dataset parsed: {row_count} rows, {len(columns)} columns")
+            logger.info(f"Step 2 complete: {row_count} rows, {len(columns)} columns")
         except Exception as parse_err:
-            logger.error(f"Parse error: {parse_err}")
+            logger.error(f"Step 2 FAILED: {parse_err}")
             columns, row_count, numeric_cols, categorical_cols, preview = [], 0, [], [], []
         
         # Use default provider if not available
+        logger.info("Step 3: Checking providers...")
         available = analysis_service.get_available_providers()
+        logger.info(f"Available providers: {available}")
         if not available.get(provider):
+            old_provider = provider
             provider = "gemini" if available.get("gemini") else "groq"
+            logger.info(f"Provider switched from {old_provider} to {provider}")
         
         # Analyze
-        logger.info(f"Starting analysis with {provider}")
+        logger.info(f"Step 4: Starting analysis with {provider}...")
         result = await analysis_service.upload_and_analyze(
             content, file.filename, provider, None
         )
-        logger.info(f"Analysis complete: {result.get('id')}")
+        logger.info(f"Step 4 complete: ID={result.get('id')}, Status={result.get('status')}")
         
         analysis = result.get("result", {})
         
