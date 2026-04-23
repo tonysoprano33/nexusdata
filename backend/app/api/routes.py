@@ -177,6 +177,9 @@ async def upload_dataset_legacy(
     """Legacy endpoint - upload and analyze dataset."""
     logger.info(f"Upload request received: {file.filename}, provider: {provider}")
     
+    import pandas as pd
+    import io
+    
     # Validate file extension
     allowed = ('.csv', '.xlsx', '.xls', '.json')
     if not file.filename.endswith(allowed):
@@ -190,8 +193,30 @@ async def upload_dataset_legacy(
         if len(content) == 0:
             raise HTTPException(400, "Empty file")
         
-        if len(content) > 10 * 1024 * 1024:  # 10MB limit for now
-            raise HTTPException(400, "File too large (max 10MB)")
+        if len(content) > 50 * 1024 * 1024:  # 50MB limit
+            raise HTTPException(400, "File too large (max 50MB)")
+        
+        # Parse dataframe for metadata
+        try:
+            if file.filename.endswith('.csv'):
+                df = pd.read_csv(io.BytesIO(content))
+            elif file.filename.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(io.BytesIO(content))
+            elif file.filename.endswith('.json'):
+                df = pd.read_json(io.BytesIO(content))
+            else:
+                df = pd.DataFrame()
+            
+            columns = df.columns.tolist()
+            row_count = len(df)
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            preview = df.head(10).to_dict(orient='records')
+            
+            logger.info(f"Dataset parsed: {row_count} rows, {len(columns)} columns")
+        except Exception as parse_err:
+            logger.error(f"Parse error: {parse_err}")
+            columns, row_count, numeric_cols, categorical_cols, preview = [], 0, [], [], []
         
         # Use default provider if not available
         available = analysis_service.get_available_providers()
@@ -215,8 +240,11 @@ async def upload_dataset_legacy(
             "recommendations": analysis.get("recommendations", []),
             "summary": analysis.get("summary", ""),
             "statistics": analysis.get("statistics", {}),
-            "row_count": 0,  # Simplified for now
-            "columns": [],
+            "row_count": row_count,
+            "columns": columns,
+            "numeric_columns": numeric_cols,
+            "categorical_columns": categorical_cols,
+            "preview": preview,
             "fallback_used": result.get("fallback_used", False),
             "provider_used": provider
         }
