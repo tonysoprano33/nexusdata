@@ -24,7 +24,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export function ChartsGrid({ charts_data, isProcessing }: { charts_data?: ChartData[], isProcessing?: boolean }) {
+interface ChartsGridProps {
+  charts_data?: ChartData[];
+  statistics?: any;
+  rawPreview?: any[];
+  isProcessing?: boolean;
+}
+
+export function ChartsGrid({ charts_data, statistics, rawPreview, isProcessing }: ChartsGridProps) {
   if (isProcessing) {
     return (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-px bg-zinc-900 border border-zinc-900">
@@ -44,22 +51,102 @@ export function ChartsGrid({ charts_data, isProcessing }: { charts_data?: ChartD
     );
   }
 
-  if (!charts_data || charts_data.length === 0) {
+  // Generate charts from statistics if available
+  const generatedCharts = generateChartsFromData(statistics, rawPreview || []);
+  const displayCharts = charts_data && charts_data.length > 0 ? charts_data : generatedCharts;
+
+  if (!displayCharts || displayCharts.length === 0) {
     return (
       <div className="py-32 text-center border border-dashed border-zinc-900 rounded-sm">
         <Activity className="w-8 h-8 text-zinc-800 mx-auto mb-4" />
-        <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">Awaiting Neural Visuals</h3>
+        <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">No Visual Data Available</h3>
+        <p className="text-xs text-zinc-700 mt-2">Upload a dataset with numeric columns to see charts</p>
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-px bg-zinc-900 border border-zinc-900">
-      {charts_data.map((chart, index) => (
+      {displayCharts.map((chart, index) => (
         <ChartRenderer key={index} chartData={chart} index={index} />
       ))}
     </div>
   );
+}
+
+// Generate relevant charts from actual dataset statistics
+function generateChartsFromData(statistics: any, rawPreview: any[]): ChartData[] {
+  if (!statistics || !rawPreview || rawPreview.length === 0) return [];
+  
+  const charts: ChartData[] = [];
+  const columns = Object.keys(rawPreview[0]);
+  
+  // 1. Missing Values Chart - always relevant
+  const missingCols = columns.filter(col => {
+    const missing = statistics?.missing_values?.columns?.[col]?.count || 0;
+    return missing > 0;
+  });
+  
+  if (missingCols.length > 0) {
+    charts.push({
+      type: 'bar',
+      title: 'Missing Values by Column',
+      insight: `Data quality issues in ${missingCols.length} columns`,
+      x: missingCols,
+      y: missingCols.map(col => statistics?.missing_values?.columns?.[col]?.count || 0),
+      labels: missingCols,
+      values: missingCols.map(col => statistics?.missing_values?.columns?.[col]?.count || 0)
+    });
+  }
+  
+  // 2. Numeric Distribution - for numeric columns
+  if (statistics?.numeric_summary) {
+    const numericCols = Object.keys(statistics.numeric_summary).slice(0, 4);
+    if (numericCols.length > 0) {
+      // Distribution of means
+      charts.push({
+        type: 'bar',
+        title: 'Column Means Distribution',
+        insight: `Average values across ${numericCols.length} numeric columns`,
+        x: numericCols,
+        y: numericCols.map(col => statistics.numeric_summary[col]?.mean || 0),
+        labels: numericCols,
+        values: numericCols.map(col => statistics.numeric_summary[col]?.mean || 0)
+      });
+      
+      // Std deviation comparison
+      charts.push({
+        type: 'bar',
+        title: 'Standard Deviation by Column',
+        insight: 'Variability measure - higher = more spread out data',
+        x: numericCols,
+        y: numericCols.map(col => statistics.numeric_summary[col]?.std || 0),
+        labels: numericCols,
+        values: numericCols.map(col => statistics.numeric_summary[col]?.std || 0)
+      });
+    }
+  }
+  
+  // 3. Data Type Distribution
+  const typeCounts: Record<string, number> = {};
+  columns.forEach(col => {
+    const type = typeof rawPreview[0][col];
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  });
+  
+  if (Object.keys(typeCounts).length > 1) {
+    charts.push({
+      type: 'pie',
+      title: 'Data Types Distribution',
+      insight: 'Proportion of column types in dataset',
+      x: Object.keys(typeCounts),
+      y: Object.values(typeCounts),
+      labels: Object.keys(typeCounts),
+      values: Object.values(typeCounts)
+    });
+  }
+  
+  return charts.slice(0, 4); // Max 4 charts
 }
 
 function ChartRenderer({ chartData, index }: { chartData: ChartData; index: number }) {

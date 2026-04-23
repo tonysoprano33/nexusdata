@@ -1,7 +1,12 @@
 "use client";
 import { CheckCircle2, ShieldCheck, Zap, Database, ArrowUp, Minus, AlertCircle, TrendingUp } from "lucide-react";
 
-export function CleaningReport({ report }: { report: any }) {
+interface CleaningReportProps {
+  report: any;
+  statistics?: any;
+}
+
+export function CleaningReport({ report, statistics }: CleaningReportProps) {
   if (!report) return null;
 
   const improvement = report.improvement || (report.score_after - report.score_before);

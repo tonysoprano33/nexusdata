@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const fetch = async () => {
@@ -87,54 +88,80 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans selection:bg-indigo-500/30">
-      <TopNavbar sidebarCollapsed={true} datasetName={analysis?.filename} />
+      {/* Sidebar */}
+      <EnterpriseSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       
-      <main className="pt-20 pb-40 max-w-[1200px] mx-auto px-6">
-        {/* Minimal Breadcrumb */}
-        <div className="flex items-center gap-2 mb-12 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
-           <button onClick={() => router.push("/")} className="hover:text-white transition-colors">Workspace</button>
-           <ChevronRight className="w-3 h-3" />
-           <span className="text-zinc-400">{analysis?.filename}</span>
-        </div>
-
-        {analysis && (
-          <div className="space-y-32"> {/* Aumento masivo de espacio entre secciones */}
-            
-            <HeroBanner
-              filename={analysis.filename}
-              totalRows={result.dataset_dna?.total_rows || 0}
-              totalColumns={result.dataset_dna?.total_columns || 0}
-              qualityBefore={result.cleaning_report?.score_before || 0}
-              qualityAfter={result.cleaning_report?.score_after || 0}
-              datasetId={datasetId}
-              onScrollTo={(id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}
-            />
-
-            <QuickActions />
-
-            <Section id="insights" icon={Sparkles} title="Strategic Insights" subtitle="3 Actionable recommendations for business growth">
-               <AIInsightsPanel insights={result.business_insights} totalRows={result.dataset_dna?.total_rows} />
-            </Section>
-
-            <Section id="cleaning" icon={Wand2} title="Data Integrity" subtitle="Cleanup metrics and structural fixes">
-               <CleaningReport report={result.cleaning_report} />
-            </Section>
-
-            <Section id="preview" icon={Eye} title="Head Comparison" subtitle="Direct audit of first 5 rows (Original vs Cleaned)">
-              <DataPreviewTabs rawPreview={result.raw_preview} cleanPreview={result.clean_preview} />
-            </Section>
-
-            <Section id="charts" icon={BarChart3} title="Visual Explorer" subtitle="Automated statistical distributions">
-              <ChartsGrid charts_data={result.charts_data} isProcessing={!isCompleted} />
-            </Section>
-
-            <Section id="chat" icon={MessageSquare} title="AI Data Auditor" subtitle="Inquire about patterns or request specific transformations">
-              <ChatDataset datasetId={datasetId} />
-            </Section>
-
+      {/* Main content with sidebar offset */}
+      <div className={cn("transition-all duration-300", sidebarCollapsed ? "ml-16" : "ml-60")}>
+        <TopNavbar sidebarCollapsed={sidebarCollapsed} datasetName={analysis?.filename} />
+        
+        <main className="pt-20 pb-40 max-w-[1200px] mx-auto px-6">
+          {/* Minimal Breadcrumb */}
+          <div className="flex items-center gap-2 mb-12 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+             <button onClick={() => router.push("/")} className="hover:text-white transition-colors">Workspace</button>
+             <ChevronRight className="w-3 h-3" />
+             <span className="text-zinc-400">{analysis?.filename}</span>
           </div>
-        )}
-      </main>
+
+          {analysis && (
+            <div className="space-y-24">
+              
+              {/* 1. Hero - Dataset Overview */}
+              <HeroBanner
+                filename={analysis.filename}
+                totalRows={result.dataset_dna?.total_rows || 0}
+                totalColumns={result.dataset_dna?.total_columns || 0}
+                qualityBefore={result.cleaning_report?.score_before || 0}
+                qualityAfter={result.cleaning_report?.score_after || 0}
+                rowsRemoved={result.cleaning_report?.rows_removed || 0}
+                improvement={result.cleaning_report?.improvement || 0}
+                statistics={result.statistics}
+                datasetId={datasetId}
+                onScrollTo={(id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}
+              />
+
+              {/* 2. Strategic Insights - Most Important */}
+              <Section id="insights" icon={Sparkles} title="Strategic Insights" subtitle="AI-generated analysis and business recommendations">
+                 <AIInsightsPanel insights={result.business_insights} totalRows={result.dataset_dna?.total_rows} />
+              </Section>
+
+              {/* 3. Data Integrity - What Changed */}
+              <Section id="cleaning" icon={Wand2} title="Data Integrity Report" subtitle="Quality transformation and cleanup actions">
+                 <CleaningReport report={result.cleaning_report} statistics={result.statistics} />
+              </Section>
+
+              {/* 4. Head Comparison - Before/After Data */}
+              <Section id="preview" icon={Eye} title="Data Comparison" subtitle="Explore raw vs cleaned: head, describe, info, top values">
+                <DataPreviewTabs 
+                  rawPreview={result.raw_preview} 
+                  cleanPreview={result.clean_preview}
+                  rawStats={result.statistics?.raw}
+                  cleanStats={result.statistics?.clean}
+                />
+              </Section>
+
+              {/* 5. Visual Explorer - Charts */}
+              <Section id="charts" icon={BarChart3} title="Visual Explorer" subtitle="Statistical distributions and correlations">
+                <ChartsGrid 
+                  charts_data={result.charts_data} 
+                  statistics={result.statistics}
+                  rawPreview={result.raw_preview}
+                  isProcessing={!isCompleted} 
+                />
+              </Section>
+
+              {/* 6. Quick Actions */}
+              <QuickActions />
+
+              {/* 7. AI Chat - Least Important */}
+              <Section id="chat" icon={MessageSquare} title="AI Data Auditor" subtitle="Ask questions about your dataset">
+                <ChatDataset datasetId={datasetId} />
+              </Section>
+
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
