@@ -167,3 +167,17 @@ class AnalysisService:
             "gemini": self.gemini.is_available(),
             "groq": self.groq.is_available()
         }
+    
+    async def delete_analysis(self, analysis_id: str) -> bool:
+        """Delete an analysis by ID."""
+        db = get_supabase_db()
+        if not db.client:
+            return False
+        return await db.delete_analysis(analysis_id)
+    
+    async def delete_all_analyses(self) -> int:
+        """Delete all analyses. Returns count of deleted items."""
+        db = get_supabase_db()
+        if not db.client:
+            return 0
+        return await db.delete_all_analyses()

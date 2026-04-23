@@ -250,3 +250,43 @@ async def chat_with_dataset_legacy(
     except Exception as e:
         logger.error(f"Error in chat: {e}")
         raise HTTPException(status_code=500, detail="Chat failed")
+
+
+@router.delete("/datasets/{dataset_id}")
+async def delete_dataset_legacy(dataset_id: str):
+    """Legacy endpoint - delete a specific dataset by ID."""
+    try:
+        deleted = await analysis_service.delete_analysis(dataset_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Dataset not found or could not be deleted")
+        return {
+            "success": True,
+            "message": f"Dataset {dataset_id} deleted successfully",
+            "id": dataset_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting dataset: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete dataset")
+
+
+@router.delete("/datasets/")
+async def delete_all_datasets_legacy(confirm: bool = Query(False, description="Set to true to confirm deletion of all datasets")):
+    """Legacy endpoint - delete all datasets. Requires confirmation."""
+    if not confirm:
+        raise HTTPException(
+            status_code=400, 
+            detail="Add ?confirm=true to confirm deletion of all datasets"
+        )
+    
+    try:
+        count = await analysis_service.delete_all_analyses()
+        return {
+            "success": True,
+            "message": f"Deleted {count} datasets",
+            "count": count
+        }
+    except Exception as e:
+        logger.error(f"Error deleting all datasets: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete datasets")

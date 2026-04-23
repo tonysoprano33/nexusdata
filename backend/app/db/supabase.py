@@ -96,6 +96,35 @@ class SupabaseDB:
         except Exception as e:
             logger.error(f"Error listing analyses: {e}")
             return []
+    
+    async def delete_analysis(self, analysis_id: str) -> bool:
+        """Delete an analysis by ID."""
+        if not self._client:
+            return False
+        
+        try:
+            result = self._client.table("dataset_analyses").delete().eq("id", analysis_id).execute()
+            return len(result.data) > 0 if result.data else False
+        except Exception as e:
+            logger.error(f"Error deleting analysis: {e}")
+            return False
+    
+    async def delete_all_analyses(self) -> int:
+        """Delete all analyses. Returns count of deleted items."""
+        if not self._client:
+            return 0
+        
+        try:
+            # First get count
+            count_result = self._client.table("dataset_analyses").select("id", count="exact").execute()
+            count = count_result.count if hasattr(count_result, 'count') else 0
+            
+            # Delete all
+            result = self._client.table("dataset_analyses").delete().neq("id", "").execute()
+            return len(result.data) if result.data else count
+        except Exception as e:
+            logger.error(f"Error deleting all analyses: {e}")
+            return 0
 
 
 # Global instance (lazy initialization)
