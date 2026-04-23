@@ -3,6 +3,7 @@ import uuid
 from typing import Optional, Dict, Any
 from app.services.gemini_service import GeminiService
 from app.services.groq_service import GroqService
+from app.services.data_cleaning_service import get_data_cleaning_service
 from app.db.supabase import get_supabase_db
 import logging
 import io
@@ -12,11 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class AnalysisService:
-    """Service for orchestrating dataset analysis."""
+    """Service for orchestrating dataset analysis with data cleaning."""
     
     def __init__(self):
         self.gemini = GeminiService()
         self.groq = GroqService()
+        self.cleaning_service = get_data_cleaning_service()
     
     async def upload_and_analyze(
         self,
@@ -50,8 +52,14 @@ class AnalysisService:
         try:
             # Parse dataset
             logger.info(f"[ANALYSIS] Parsing dataset...")
-            df = self._parse_dataset(file_content, filename)
-            logger.info(f"[ANALYSIS] Dataset parsed: {len(df)} rows, {len(df.columns)} cols")
+            df_raw = self._parse_dataset(file_content, filename)
+            logger.info(f"[ANALYSIS] Dataset parsed: {len(df_raw)} rows, {len(df_raw.columns)} cols")
+            
+            # CLEAN DATA - Professional data cleaning
+            logger.info(f"[ANALYSIS] Starting data cleaning...")
+            df, cleaning_report = self.cleaning_service.clean_dataset(df_raw)
+            logger.info(f"[ANALYSIS] Data cleaning complete: {cleaning_report['rows_removed']} rows removed, "
+                       f"quality {cleaning_report['quality_before']:.1f}% → {cleaning_report['quality_after']:.1f}%")
             
             # Update status to processing (if Supabase configured)
             if db.client:
@@ -114,11 +122,19 @@ class AnalysisService:
             # Clean result for JSON serialization
             clean_result = self._clean_for_json(result)
             
-            # Add preview to result if provided (clean it too)
-            if preview:
-                clean_preview = self._clean_for_json(preview)
-                clean_result["raw_preview"] = clean_preview
-                clean_result["clean_preview"] = []
+            # Add cleaning report with previews
+            clean_result["cleaning_report"] = {
+                "score_before": cleaning_report["quality_before"],
+                "score_after": cleaning_report["quality_after"],
+                "rows_removed": cleaning_report["rows_removed"],
+                "original_rows": cleaning_report["original_rows"],
+                "final_rows": cleaning_report["final_rows"],
+                "improvement": cleaning_report["improvement"],
+                "steps": cleaning_report["cleaning_steps"],
+                "changes_made": cleaning_report["changes_made"]
+            }
+            clean_result["raw_preview"] = cleaning_report["raw_preview"]
+            clean_result["clean_preview"] = cleaning_report["clean_preview"]
             
             # Update with results (if Supabase configured)
             if db.client:

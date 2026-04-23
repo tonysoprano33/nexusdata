@@ -151,6 +151,9 @@ async def get_dataset_legacy(dataset_id: str):
         # Format for frontend - wrap in result object as expected
         analysis_result = result.get("analysis_result", {})
         stats = analysis_result.get("statistics", {})
+        cleaning_report = analysis_result.get("cleaning_report", {})
+        raw_preview = analysis_result.get("raw_preview", [])
+        clean_preview = analysis_result.get("clean_preview", [])
         
         return {
             "id": result.get("id"),
@@ -160,16 +163,21 @@ async def get_dataset_legacy(dataset_id: str):
             "updated_at": result.get("updated_at"),
             "result": {
                 "dataset_dna": {
-                    "total_rows": stats.get("total_rows", 0),
+                    "total_rows": cleaning_report.get("final_rows", stats.get("total_rows", 0)),
                     "total_columns": stats.get("total_columns", 0),
                 },
                 "cleaning_report": {
-                    "score_before": 0,
-                    "score_after": 0,
+                    "score_before": cleaning_report.get("score_before", 0),
+                    "score_after": cleaning_report.get("score_after", 0),
+                    "rows_removed": cleaning_report.get("rows_removed", 0),
+                    "original_rows": cleaning_report.get("original_rows", stats.get("total_rows", 0)),
+                    "final_rows": cleaning_report.get("final_rows", stats.get("total_rows", 0)),
+                    "improvement": cleaning_report.get("improvement", 0),
+                    "changes_made": cleaning_report.get("changes_made", [])
                 },
                 "business_insights": analysis_result.get("insights", ""),
-                "raw_preview": [],
-                "clean_preview": [],
+                "raw_preview": raw_preview,
+                "clean_preview": clean_preview,
                 "chart_recommendations": [],
                 "charts_data": [],
                 "insights": analysis_result.get("insights", ""),
@@ -299,32 +307,42 @@ async def upload_dataset_legacy(
         clean_response = clean_for_json(response)
         logger.info(f"Step 5: Response ready with {len(clean_response.get('insights', ''))} chars insights")
         
+        # Extract cleaning report from analysis data
+        cleaning_report = analysis_data.get("cleaning_report", {})
+        raw_preview = analysis_data.get("raw_preview", [])
+        clean_preview = analysis_data.get("clean_preview", [])
+        
         # Return in format expected by frontend
         return {
-            "id": clean_response.get("id"),
-            "filename": clean_response.get("filename"),
-            "status": clean_response.get("status"),
+            "id": result.get("id"),
+            "filename": file.filename,
+            "status": result.get("status"),
             "result": {
                 "dataset_dna": {
-                    "total_rows": clean_response.get("row_count", 0),
-                    "total_columns": len(clean_response.get("columns", [])),
+                    "total_rows": cleaning_report.get("final_rows", row_count),
+                    "total_columns": len(columns),
                 },
                 "cleaning_report": {
-                    "score_before": 0,
-                    "score_after": 0,
+                    "score_before": cleaning_report.get("score_before", 0),
+                    "score_after": cleaning_report.get("score_after", 0),
+                    "rows_removed": cleaning_report.get("rows_removed", 0),
+                    "original_rows": cleaning_report.get("original_rows", row_count),
+                    "final_rows": cleaning_report.get("final_rows", row_count),
+                    "improvement": cleaning_report.get("improvement", 0),
+                    "changes_made": cleaning_report.get("changes_made", [])
                 },
-                "business_insights": clean_response.get("insights", ""),
-                "raw_preview": clean_response.get("preview", []),
-                "clean_preview": [],
+                "business_insights": analysis_data.get("insights", ""),
+                "raw_preview": raw_preview,
+                "clean_preview": clean_preview,
                 "chart_recommendations": [],
                 "charts_data": [],
-                "insights": clean_response.get("insights", ""),
-                "recommendations": clean_response.get("recommendations", []),
-                "summary": clean_response.get("summary", ""),
-                "statistics": clean_response.get("statistics", {})
+                "insights": analysis_data.get("insights", ""),
+                "recommendations": analysis_data.get("recommendations", []),
+                "summary": analysis_data.get("summary", ""),
+                "statistics": analysis_data.get("statistics", {})
             },
-            "fallback_used": clean_response.get("fallback_used", False),
-            "provider_used": clean_response.get("provider_used", provider)
+            "fallback_used": result.get("fallback_used", False),
+            "provider_used": provider
         }
         
     except HTTPException:
