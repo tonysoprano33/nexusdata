@@ -175,29 +175,67 @@ async def upload_dataset_legacy(
     provider: str = Form("gemini")
 ):
     """Legacy endpoint - upload and analyze dataset with complete response."""
-    # First do the analysis
-    result = await analyze_dataset(background_tasks, file, provider, None)
-    
-    # Read file again for metadata (since analyze_dataset consumed it)
-    await file.seek(0)
-    content = await file.read()
-    
-    # Parse for additional metadata
     import io
     import pandas as pd
-    try:
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(content))
-        elif file.filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(content))
-        elif file.filename.endswith('.json'):
-            df = pd.read_json(io.BytesIO(content))
+    
+    # Validate provider
+    available_providers = analysis_service.get_available_providers()
+    if provider not in available_providers or not available_providers[provider]:
+        # Try fallback
+        fallback = "groq" if provider == "gemini" else "gemini"
+        if available_providers.get(fallback):
+            provider = fallback
         else:
-            df = pd.DataFrame()
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Provider '{provider}' is not available"
+            )
+    
+    # Validate file
+    allowed_extensions = ('.csv', '.xlsx', '.xls', '.json')
+    if not file.filename.endswith(allowed_extensions):
+        raise HTTPException(
+            status_code=400,
+            detail=f"File must be one of: {', '.join(allowed_extensions)}"
+        )
+    
+    try:
+        # Read file content ONCE
+        content = await file.read()
         
-        # Build enhanced response
-        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="Empty file")
+        
+        if len(content) > 100 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 100MB)")
+        
+        # Parse for metadata
+        try:
+            if file.filename.endswith('.csv'):
+                df = pd.read_csv(io.BytesIO(content))
+            elif file.filename.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(io.BytesIO(content))
+            elif file.filename.endswith('.json'):
+                df = pd.read_json(io.BytesIO(content))
+            else:
+                df = pd.DataFrame()
+            
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            columns = df.columns.tolist()
+            row_count = len(df)
+            preview = df.head(10).to_dict(orient='records')
+        except Exception as parse_error:
+            logger.error(f"Error parsing file for metadata: {parse_error}")
+            columns, numeric_cols, categorical_cols, row_count, preview = [], [], [], 0, []
+        
+        # Perform analysis (content is already in memory)
+        result = await analysis_service.upload_and_analyze(
+            content,
+            file.filename,
+            provider,
+            None
+        )
         
         analysis_result = result.get("result", {})
         
@@ -205,11 +243,11 @@ async def upload_dataset_legacy(
             "id": result.get("id"),
             "filename": file.filename,
             "status": result.get("status"),
-            "columns": df.columns.tolist(),
+            "columns": columns,
             "numeric_columns": numeric_cols,
             "categorical_columns": categorical_cols,
-            "row_count": len(df),
-            "preview": df.head(10).to_dict(orient='records'),
+            "row_count": row_count,
+            "preview": preview,
             "insights": analysis_result.get("insights", ""),
             "recommendations": analysis_result.get("recommendations", []),
             "summary": analysis_result.get("summary", ""),
@@ -217,10 +255,15 @@ async def upload_dataset_legacy(
             "fallback_used": result.get("fallback_used", False),
             "provider_used": "groq" if result.get("fallback_used") else provider
         }
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error building response: {e}")
-        # Return basic result if parsing fails
-        return result
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @router.post("/datasets/{dataset_id}/chat")
