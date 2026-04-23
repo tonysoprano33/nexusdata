@@ -23,7 +23,8 @@ class AnalysisService:
         file_content: bytes,
         filename: str,
         provider: str = "gemini",
-        custom_prompt: Optional[str] = None
+        custom_prompt: Optional[str] = None,
+        preview: Optional[list] = None
     ) -> Dict[str, Any]:
         """Upload a dataset and perform analysis."""
         logger.info(f"[ANALYSIS] Starting upload_and_analyze for {filename} with {provider}")
@@ -112,6 +113,11 @@ class AnalysisService:
             
             # Clean result for JSON serialization
             clean_result = self._clean_for_json(result)
+            
+            # Add preview to result if provided
+            if preview:
+                clean_result["raw_preview"] = preview
+                clean_result["clean_preview"] = []
             
             # Update with results (if Supabase configured)
             if db.client:

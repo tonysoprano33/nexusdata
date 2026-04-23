@@ -267,7 +267,7 @@ async def upload_dataset_legacy(
         # Analyze
         logger.info(f"Step 4: Starting analysis with {provider}...")
         result = await analysis_service.upload_and_analyze(
-            content, file.filename, provider, None
+            content, file.filename, provider, None, preview
         )
         logger.info(f"Step 4 complete: ID={result.get('id')}, Status={result.get('status')}")
         
