@@ -24,16 +24,27 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
+    logger.info("="*50)
     logger.info("Starting up NexusData API...")
+    logger.info("="*50)
     
     # Verify configuration
     settings = get_settings()
+    
+    logger.info(f"APP_ENV: {settings.app_env}")
+    logger.info(f"Supabase URL set: {bool(settings.supabase_url)}")
+    logger.info(f"Supabase Key set: {bool(settings.supabase_key)}")
+    logger.info(f"Gemini Key set: {bool(settings.gemini_api_key)}")
+    logger.info(f"Groq Key set: {bool(settings.groq_api_key)}")
+    
     if not settings.supabase_url or not settings.supabase_key:
         logger.warning("Supabase credentials not configured!")
     if not settings.gemini_api_key:
         logger.warning("Gemini API key not configured!")
     if not settings.groq_api_key:
         logger.warning("Groq API key not configured!")
+    
+    logger.info("API Ready!")
     
     yield
     
