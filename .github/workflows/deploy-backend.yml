@@ -1,0 +1,21 @@
+name: Deploy Backend to Render
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Deploy to Render
+        run: |
+          echo "Triggering Render deploy..."
+          curl -X POST "https://api.render.com/deploy/srv-d7ek03flk1mc73bqt4c0?key=LzMlj4CXPUQ"
+          echo "Deploy triggered!"
