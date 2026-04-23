@@ -42,49 +42,76 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Safety timeout - force stop loading after 35 seconds no matter what
   useEffect(() => {
-    const fetch = async () => {
+    const safetyTimer = setTimeout(() => {
+      if (loading) {
+        console.error("[Dashboard] Safety timeout triggered - forcing loading stop");
+        setLoading(false);
+        if (!analysis) {
+          setAnalysis({ id: datasetId, status: 'error', result: null, error: 'Request timeout - please refresh' });
+        }
+      }
+    }, 35000);
+    
+    return () => clearTimeout(safetyTimer);
+  }, [loading, datasetId, analysis]);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      if (!datasetId) return;
+      
       try {
         console.log("[Dashboard] Fetching dataset:", datasetId);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
         
         const { data } = await axios.get(`${API_URL}/api/datasets/${datasetId}`, {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
         
+        if (!isMounted) return;
+        
         console.log("[Dashboard] Received data:", data);
-        console.log("[Dashboard] Result object:", data?.result);
-        console.log("[Dashboard] Insights present:", !!data?.result?.business_insights);
         
         if (!data || !data.result) {
           console.error("[Dashboard] Invalid data structure received");
+          setAnalysis({ id: datasetId, status: 'error', result: null, error: 'Invalid data from server' });
+        } else {
+          setAnalysis(data);
+        }
+      } catch (e: any) {
+        if (!isMounted) return;
+        
+        console.error("[Dashboard] Error fetching:", e);
+        let errorMsg = 'Failed to load dataset';
+        if (e.name === 'AbortError') {
+          errorMsg = 'Request timed out - server may be slow';
+        } else if (e.response?.status === 404) {
+          errorMsg = 'Dataset not found';
+        } else if (e.message) {
+          errorMsg = e.message;
         }
         
-        setAnalysis(data);
-      } catch (e: any) {
-        console.error("[Dashboard] Error fetching:", e);
-        if (e.name === 'AbortError') {
-          console.error("[Dashboard] Request timeout");
-        }
-        // Set empty analysis to stop loading and show error state
-        setAnalysis({ id: datasetId, status: 'error', result: null });
+        setAnalysis({ id: datasetId, status: 'error', result: null, error: errorMsg });
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
-    if (datasetId) fetch();
+    
+    fetchData();
+    
+    return () => { isMounted = false; };
   }, [datasetId]);
-
-  if (loading) return (
-    <div className="min-h-screen bg-[#030303] flex items-center justify-center">
-      <Loader2 className="w-8 h-8 text-zinc-800 animate-spin" />
-    </div>
-  );
 
   const result = analysis?.result || {};
   const isCompleted = analysis?.status === "completed";
+  const hasError = analysis?.status === 'error';
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans selection:bg-indigo-500/30">
@@ -96,6 +123,40 @@ export default function DashboardPage() {
         <TopNavbar sidebarCollapsed={sidebarCollapsed} datasetName={analysis?.filename} />
         
         <main className="pt-20 pb-40 max-w-[1200px] mx-auto px-6">
+          
+          {/* Loading State - INSIDE sidebar layout */}
+          {loading && (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+              <Loader2 className="w-10 h-10 text-zinc-700 animate-spin" />
+              <p className="text-sm text-zinc-600">Loading dataset analysis...</p>
+              <p className="text-xs text-zinc-700">This may take up to 30 seconds</p>
+            </div>
+          )}
+          
+          {/* Error State */}
+          {hasError && !loading && (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center mb-2">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h2 className="text-xl font-bold text-white">Failed to Load Dataset</h2>
+              <p className="text-sm text-zinc-500 max-w-md text-center">{analysis?.error || 'Unknown error occurred'}</p>
+              <div className="flex gap-3 mt-4">
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="px-4 py-2 bg-white text-black rounded-lg text-sm font-bold hover:bg-zinc-200"
+                >
+                  Retry
+                </button>
+                <button 
+                  onClick={() => router.push('/datasets')} 
+                  className="px-4 py-2 bg-zinc-800 text-white rounded-lg text-sm font-bold hover:bg-zinc-700"
+                >
+                  Go to Datasets
+                </button>
+              </div>
+            </div>
+          )}
           {/* Minimal Breadcrumb */}
           <div className="flex items-center gap-2 mb-12 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
              <button onClick={() => router.push("/")} className="hover:text-white transition-colors">Workspace</button>
@@ -103,7 +164,8 @@ export default function DashboardPage() {
              <span className="text-zinc-400">{analysis?.filename}</span>
           </div>
 
-          {analysis && (
+          {/* Content - Only show when loaded and no error */}
+          {!loading && !hasError && analysis && (
             <div className="space-y-24">
               
               {/* 1. Hero - Dataset Overview */}
