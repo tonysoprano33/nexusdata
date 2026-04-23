@@ -271,17 +271,21 @@ async def upload_dataset_legacy(
         )
         logger.info(f"Step 4 complete: ID={result.get('id')}, Status={result.get('status')}")
         
-        analysis = result.get("result", {})
+        # Result from analysis_service has: id, status, result (containing insights), fallback_used
+        analysis_data = result.get("result", {}) or {}
+        
+        logger.info(f"Analysis data keys: {analysis_data.keys() if analysis_data else 'EMPTY'}")
+        logger.info(f"Insights length: {len(analysis_data.get('insights', ''))}")
         
         # Build response
         response = {
             "id": result.get("id"),
             "filename": file.filename,
             "status": result.get("status"),
-            "insights": analysis.get("insights", ""),
-            "recommendations": analysis.get("recommendations", []),
-            "summary": analysis.get("summary", ""),
-            "statistics": analysis.get("statistics", {}),
+            "insights": analysis_data.get("insights", ""),
+            "recommendations": analysis_data.get("recommendations", []),
+            "summary": analysis_data.get("summary", ""),
+            "statistics": analysis_data.get("statistics", {}),
             "row_count": row_count,
             "columns": columns,
             "numeric_columns": numeric_cols,
