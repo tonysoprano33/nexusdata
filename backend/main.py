@@ -47,12 +47,22 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+origins = [
+    "https://nexusdata-gamma.vercel.app",
+    "https://nexusdata.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "*"  # Fallback for development
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly in production
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # Include API routes
