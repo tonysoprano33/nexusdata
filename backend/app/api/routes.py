@@ -148,8 +148,9 @@ async def get_dataset_legacy(dataset_id: str):
         if not result:
             raise HTTPException(status_code=404, detail="Dataset not found")
         
-        # Format for frontend
+        # Format for frontend - wrap in result object as expected
         analysis_result = result.get("analysis_result", {})
+        stats = analysis_result.get("statistics", {})
         
         return {
             "id": result.get("id"),
@@ -157,10 +158,25 @@ async def get_dataset_legacy(dataset_id: str):
             "status": result.get("status"),
             "created_at": result.get("created_at"),
             "updated_at": result.get("updated_at"),
-            "insights": analysis_result.get("insights", ""),
-            "recommendations": analysis_result.get("recommendations", []),
-            "summary": analysis_result.get("summary", ""),
-            "statistics": analysis_result.get("statistics", {})
+            "result": {
+                "dataset_dna": {
+                    "total_rows": stats.get("total_rows", 0),
+                    "total_columns": stats.get("total_columns", 0),
+                },
+                "cleaning_report": {
+                    "score_before": 0,
+                    "score_after": 0,
+                },
+                "business_insights": analysis_result.get("insights", ""),
+                "raw_preview": [],
+                "clean_preview": [],
+                "chart_recommendations": [],
+                "charts_data": [],
+                "insights": analysis_result.get("insights", ""),
+                "recommendations": analysis_result.get("recommendations", []),
+                "summary": analysis_result.get("summary", ""),
+                "statistics": stats
+            }
         }
     except HTTPException:
         raise
@@ -278,7 +294,34 @@ async def upload_dataset_legacy(
         # Clean any NaN/Inf values for JSON
         clean_response = clean_for_json(response)
         logger.info(f"Step 5: Response ready with {len(clean_response.get('insights', ''))} chars insights")
-        return clean_response
+        
+        # Return in format expected by frontend
+        return {
+            "id": clean_response.get("id"),
+            "filename": clean_response.get("filename"),
+            "status": clean_response.get("status"),
+            "result": {
+                "dataset_dna": {
+                    "total_rows": clean_response.get("row_count", 0),
+                    "total_columns": len(clean_response.get("columns", [])),
+                },
+                "cleaning_report": {
+                    "score_before": 0,
+                    "score_after": 0,
+                },
+                "business_insights": clean_response.get("insights", ""),
+                "raw_preview": clean_response.get("preview", []),
+                "clean_preview": [],
+                "chart_recommendations": [],
+                "charts_data": [],
+                "insights": clean_response.get("insights", ""),
+                "recommendations": clean_response.get("recommendations", []),
+                "summary": clean_response.get("summary", ""),
+                "statistics": clean_response.get("statistics", {})
+            },
+            "fallback_used": clean_response.get("fallback_used", False),
+            "provider_used": clean_response.get("provider_used", provider)
+        }
         
     except HTTPException:
         raise
