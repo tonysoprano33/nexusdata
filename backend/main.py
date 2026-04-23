@@ -75,8 +75,23 @@ async def root():
     return {
         "name": "NexusData API",
         "version": "1.0.0",
-        "docs": "/docs"
+        "docs": "/docs",
+        "cors": "enabled"
     }
+
+
+@app.options("/{path:path}")
+async def handle_options(path: str):
+    """Handle OPTIONS requests for CORS preflight."""
+    from fastapi.responses import Response
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 
 if __name__ == "__main__":
