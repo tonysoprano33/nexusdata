@@ -44,14 +44,31 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetch = async () => {
       try {
-        console.log("Fetching dataset:", datasetId);
-        const { data } = await axios.get(`${API_URL}/api/datasets/${datasetId}`);
-        console.log("Received data:", data);
-        console.log("Result object:", data?.result);
-        console.log("Insights:", data?.result?.business_insights);
+        console.log("[Dashboard] Fetching dataset:", datasetId);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        
+        const { data } = await axios.get(`${API_URL}/api/datasets/${datasetId}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        console.log("[Dashboard] Received data:", data);
+        console.log("[Dashboard] Result object:", data?.result);
+        console.log("[Dashboard] Insights present:", !!data?.result?.business_insights);
+        
+        if (!data || !data.result) {
+          console.error("[Dashboard] Invalid data structure received");
+        }
+        
         setAnalysis(data);
-      } catch (e) {
-        console.error("Error fetching:", e);
+      } catch (e: any) {
+        console.error("[Dashboard] Error fetching:", e);
+        if (e.name === 'AbortError') {
+          console.error("[Dashboard] Request timeout");
+        }
+        // Set empty analysis to stop loading and show error state
+        setAnalysis({ id: datasetId, status: 'error', result: null });
       } finally {
         setLoading(false);
       }
@@ -108,7 +125,7 @@ export default function DashboardPage() {
             </Section>
 
             <Section id="charts" icon={BarChart3} title="Visual Explorer" subtitle="Automated statistical distributions">
-              <ChartsGrid recommendations={result.chart_recommendations} chartsData={result.charts_data} isProcessing={!isCompleted} />
+              <ChartsGrid charts_data={result.charts_data} isProcessing={!isCompleted} />
             </Section>
 
             <Section id="chat" icon={MessageSquare} title="AI Data Auditor" subtitle="Inquire about patterns or request specific transformations">
