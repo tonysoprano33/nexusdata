@@ -9,6 +9,7 @@ from app.models.schemas import (
     AnalysisResult
 )
 import logging
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -170,100 +171,62 @@ async def get_dataset_legacy(dataset_id: str):
 
 @router.post("/datasets/upload")
 async def upload_dataset_legacy(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     provider: str = Form("gemini")
 ):
-    """Legacy endpoint - upload and analyze dataset with complete response."""
-    import io
-    import pandas as pd
+    """Legacy endpoint - upload and analyze dataset."""
+    logger.info(f"Upload request received: {file.filename}, provider: {provider}")
     
-    # Validate provider
-    available_providers = analysis_service.get_available_providers()
-    if provider not in available_providers or not available_providers[provider]:
-        # Try fallback
-        fallback = "groq" if provider == "gemini" else "gemini"
-        if available_providers.get(fallback):
-            provider = fallback
-        else:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Provider '{provider}' is not available"
-            )
-    
-    # Validate file
-    allowed_extensions = ('.csv', '.xlsx', '.xls', '.json')
-    if not file.filename.endswith(allowed_extensions):
-        raise HTTPException(
-            status_code=400,
-            detail=f"File must be one of: {', '.join(allowed_extensions)}"
-        )
+    # Validate file extension
+    allowed = ('.csv', '.xlsx', '.xls', '.json')
+    if not file.filename.endswith(allowed):
+        raise HTTPException(400, f"File must be: {', '.join(allowed)}")
     
     try:
-        # Read file content ONCE
+        # Read file
         content = await file.read()
+        logger.info(f"File read: {len(content)} bytes")
         
         if len(content) == 0:
-            raise HTTPException(status_code=400, detail="Empty file")
+            raise HTTPException(400, "Empty file")
         
-        if len(content) > 100 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large (max 100MB)")
+        if len(content) > 10 * 1024 * 1024:  # 10MB limit for now
+            raise HTTPException(400, "File too large (max 10MB)")
         
-        # Parse for metadata
-        try:
-            if file.filename.endswith('.csv'):
-                df = pd.read_csv(io.BytesIO(content))
-            elif file.filename.endswith(('.xlsx', '.xls')):
-                df = pd.read_excel(io.BytesIO(content))
-            elif file.filename.endswith('.json'):
-                df = pd.read_json(io.BytesIO(content))
-            else:
-                df = pd.DataFrame()
-            
-            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-            columns = df.columns.tolist()
-            row_count = len(df)
-            preview = df.head(10).to_dict(orient='records')
-        except Exception as parse_error:
-            logger.error(f"Error parsing file for metadata: {parse_error}")
-            columns, numeric_cols, categorical_cols, row_count, preview = [], [], [], 0, []
+        # Use default provider if not available
+        available = analysis_service.get_available_providers()
+        if not available.get(provider):
+            provider = "gemini" if available.get("gemini") else "groq"
         
-        # Perform analysis (content is already in memory)
+        # Analyze
+        logger.info(f"Starting analysis with {provider}")
         result = await analysis_service.upload_and_analyze(
-            content,
-            file.filename,
-            provider,
-            None
+            content, file.filename, provider, None
         )
+        logger.info(f"Analysis complete: {result.get('id')}")
         
-        analysis_result = result.get("result", {})
+        analysis = result.get("result", {})
         
         return {
             "id": result.get("id"),
             "filename": file.filename,
             "status": result.get("status"),
-            "columns": columns,
-            "numeric_columns": numeric_cols,
-            "categorical_columns": categorical_cols,
-            "row_count": row_count,
-            "preview": preview,
-            "insights": analysis_result.get("insights", ""),
-            "recommendations": analysis_result.get("recommendations", []),
-            "summary": analysis_result.get("summary", ""),
-            "statistics": analysis_result.get("statistics", {}),
+            "insights": analysis.get("insights", ""),
+            "recommendations": analysis.get("recommendations", []),
+            "summary": analysis.get("summary", ""),
+            "statistics": analysis.get("statistics", {}),
+            "row_count": 0,  # Simplified for now
+            "columns": [],
             "fallback_used": result.get("fallback_used", False),
-            "provider_used": "groq" if result.get("fallback_used") else provider
+            "provider_used": provider
         }
         
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Upload error: {e}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        logger.error(f"Upload failed: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(500, f"Upload failed: {str(e)}")
 
 
 @router.post("/datasets/{dataset_id}/chat")

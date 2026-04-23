@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 import sys
+import traceback
 
 from app.api.routes import router
 from app.core.config import get_settings
@@ -46,24 +48,39 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+# Add CORS middleware FIRST (before any other middleware)
 origins = [
     "https://nexusdata-gamma.vercel.app",
     "https://nexusdata.vercel.app",
     "http://localhost:3000",
     "http://localhost:5173",
-    "*"  # Fallback for development
+    "*"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all for now
+    allow_credentials=False,  # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
+
+# Global exception handler with CORS headers
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global error: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 # Include API routes
 app.include_router(router, prefix="/api")
@@ -80,18 +97,10 @@ async def root():
     }
 
 
-@app.options("/{path:path}")
-async def handle_options(path: str):
-    """Handle OPTIONS requests for CORS preflight."""
-    from fastapi.responses import Response
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
-    )
+@app.get("/test-cors")
+async def test_cors():
+    """Test CORS endpoint."""
+    return {"message": "CORS is working"}
 
 
 if __name__ == "__main__":
