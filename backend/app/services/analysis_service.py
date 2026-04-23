@@ -114,9 +114,10 @@ class AnalysisService:
             # Clean result for JSON serialization
             clean_result = self._clean_for_json(result)
             
-            # Add preview to result if provided
+            # Add preview to result if provided (clean it too)
             if preview:
-                clean_result["raw_preview"] = preview
+                clean_preview = self._clean_for_json(preview)
+                clean_result["raw_preview"] = clean_preview
                 clean_result["clean_preview"] = []
             
             # Update with results (if Supabase configured)
