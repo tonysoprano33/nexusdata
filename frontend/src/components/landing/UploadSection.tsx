@@ -21,12 +21,20 @@ export function UploadSection() {
     formData.append("file", file);
 
     try {
+      console.log("Uploading file:", file.name);
       const { data } = await axios.post(`${API_URL}/api/datasets/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      if (data?.id) router.push("/dashboard/" + data.id);
+      console.log("Upload response:", data);
+      console.log("Response keys:", Object.keys(data));
+      console.log("Result object:", data.result);
+      console.log("Business insights:", data.result?.business_insights?.substring(0, 50));
+      if (data?.id) {
+        console.log("Redirecting to dashboard:", data.id);
+        router.push("/dashboard/" + data.id);
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Upload error:", error);
       setUploading(false);
       alert("Inference protocol failed. Verify GROQ endpoint connectivity.");
     }
