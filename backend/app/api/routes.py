@@ -175,6 +175,20 @@ async def upload_dataset_legacy(
     provider: str = Form("gemini")
 ):
     """Legacy endpoint - upload and analyze dataset."""
+    import math
+    
+    # Helper to clean NaN/Inf for JSON
+    def clean_for_json(obj):
+        if isinstance(obj, dict):
+            return {k: clean_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [clean_for_json(v) for v in obj]
+        elif isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return obj
+        return obj
+    
     logger.info(f"=== UPLOAD START ===")
     logger.info(f"File: {file.filename}, Provider: {provider}")
     
@@ -215,7 +229,10 @@ async def upload_dataset_legacy(
             row_count = len(df)
             numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
             categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-            preview = df.head(10).to_dict(orient='records')
+            
+            # Convert to dict and clean NaN values
+            raw_preview = df.head(10).to_dict(orient='records')
+            preview = clean_for_json(raw_preview)
             
             logger.info(f"Step 2 complete: {row_count} rows, {len(columns)} columns")
         except Exception as parse_err:
@@ -259,18 +276,6 @@ async def upload_dataset_legacy(
         }
         
         # Clean any NaN/Inf values for JSON
-        def clean_for_json(obj):
-            import math
-            if isinstance(obj, dict):
-                return {k: clean_for_json(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [clean_for_json(v) for v in obj]
-            elif isinstance(obj, float):
-                if math.isnan(obj) or math.isinf(obj):
-                    return None
-                return obj
-            return obj
-        
         clean_response = clean_for_json(response)
         logger.info(f"Step 5: Response ready with {len(clean_response.get('insights', ''))} chars insights")
         return clean_response
