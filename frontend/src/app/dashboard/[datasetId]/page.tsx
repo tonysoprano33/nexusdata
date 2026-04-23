@@ -44,10 +44,14 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetch = async () => {
       try {
+        console.log("Fetching dataset:", datasetId);
         const { data } = await axios.get(`${API_URL}/api/datasets/${datasetId}`);
+        console.log("Received data:", data);
+        console.log("Result object:", data?.result);
+        console.log("Insights:", data?.result?.business_insights);
         setAnalysis(data);
       } catch (e) {
-        console.error(e);
+        console.error("Error fetching:", e);
       } finally {
         setLoading(false);
       }
