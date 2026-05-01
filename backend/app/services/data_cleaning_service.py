@@ -72,6 +72,7 @@ class DataCleaningService:
         df, text_report = self._standardize_text(df)
         if text_report["columns_standardized"] > 0:
             report["cleaning_steps"].append(text_report)
+            report["changes_made"].append(f"Standardized text values in {text_report['columns_standardized']} columns")
         
         # Step 6: Correct data types
         df, type_report = self._correct_data_types(df)
@@ -98,7 +99,7 @@ class DataCleaningService:
         report["clean_preview"] = clean_preview
         
         logger.info(f"[CLEANING] Complete: {report['rows_removed']} rows removed, "
-                   f"quality {report['quality_before']:.1f}% → {report['quality_after']:.1f}%")
+                   f"quality {report['quality_before']:.1f}% to {report['quality_after']:.1f}%")
         
         return df, report
     

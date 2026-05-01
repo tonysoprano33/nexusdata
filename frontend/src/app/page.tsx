@@ -1,10 +1,11 @@
 "use client";
 import { UploadSection } from "@/components/landing/UploadSection";
 import { AnalysisHistory } from "@/components/landing/AnalysisHistory";
-import { Database, ChevronRight, LayoutDashboard, Terminal, Activity, Shield, ArrowRight, Cpu, Globe, Binary } from "lucide-react";
+import { Database, ChevronRight, LayoutDashboard, Terminal, Activity, Shield, ArrowRight, Globe, Binary } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { DemoDatasetButton } from "@/components/landing/DemoDatasetButton";
 
 export default function Home() {
   return (
@@ -22,8 +23,13 @@ export default function Home() {
 
         <div className="flex items-center gap-8">
            <div className="hidden lg:flex items-center gap-8 mr-6 border-r border-zinc-800 pr-8 h-6">
-              {["Inventory", "Neural", "Reports"].map((item) => (
-                <Link key={item} href={`/${item.toLowerCase() === 'inventory' ? 'datasets' : item.toLowerCase()}`} className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600 hover:text-white transition-colors">{item}</Link>
+              {[
+                { label: "Datasets", href: "/datasets" },
+                { label: "Intelligence", href: "/intelligence" },
+                { label: "Case Study", href: "/case-study" },
+                { label: "Reports", href: "/reports" },
+              ].map((item) => (
+                <Link key={item.label} href={item.href} className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600 hover:text-white transition-colors">{item.label}</Link>
               ))}
            </div>
           <Link href="/datasets">
@@ -46,7 +52,7 @@ export default function Home() {
                 className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-zinc-900/50 border border-zinc-800"
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500">Core Node #01 • GROQ LPU Inference</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500">Portfolio demo - AI data automation</span>
               </motion.div>
               
               <motion.h1 
@@ -64,9 +70,25 @@ export default function Home() {
                 transition={{ delay: 0.1, duration: 0.8 }}
                 className="text-lg text-zinc-500 font-medium leading-relaxed max-w-lg"
               >
-                Engineered for high-fidelity data cleaning and strategic insight extraction. The enterprise-standard neural pipeline.
+                A recruiter-friendly data product demo: upload messy data or run the sample dataset to see cleaning, quality scoring, insight generation and business recommendations.
               </motion.p>
             </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.22, duration: 0.7 }}
+              className="flex flex-col gap-3 sm:flex-row"
+            >
+              <DemoDatasetButton label="Run live demo" />
+              <Link
+                href="/case-study"
+                className="inline-flex h-11 items-center justify-center rounded-sm border border-zinc-800 px-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-white"
+              >
+                View case study
+                <ChevronRight className="ml-2 h-3.5 w-3.5" />
+              </Link>
+            </motion.div>
 
             <motion.div 
               initial={{ opacity: 0 }}
@@ -76,11 +98,11 @@ export default function Home() {
             >
               <div className="space-y-2">
                 <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">Architecture</p>
-                <p className="text-sm font-bold text-white uppercase">GROQ LPU™</p>
+                <p className="text-sm font-bold text-white uppercase">FastAPI + Next.js</p>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">Protocol</p>
-                <p className="text-sm font-bold text-white uppercase">E2E Encryption</p>
+                <p className="text-sm font-bold text-white uppercase">Local/Supabase storage</p>
               </div>
             </motion.div>
           </div>
@@ -124,10 +146,10 @@ export default function Home() {
       <div className="bg-zinc-950 border-b border-zinc-900 py-12">
          <div className="max-w-[1800px] mx-auto px-10 flex flex-wrap justify-between gap-12">
             {[
-              { label: "Neural Clusters", value: "4.8M", icon: Binary },
-              { label: "Extraction gain", value: "+32%", icon: Activity },
-              { label: "Processing Latency", value: "< 12ms", icon: Globe },
-              { label: "Node Integrity", value: "99.9%", icon: Shield }
+              { label: "Supported formats", value: "4", icon: Binary },
+              { label: "Export modes", value: "2", icon: Activity },
+              { label: "Dashboard modules", value: "8", icon: Globe },
+              { label: "Signup required", value: "No", icon: Shield }
             ].map((stat, i) => (
               <div key={i} className="flex items-center gap-5">
                  <stat.icon className="w-6 h-6 text-zinc-800" />
@@ -172,12 +194,17 @@ export default function Home() {
           </div>
           
           <div className="flex gap-16">
-            {["Security Protocol", "Inference API", "Privacy Manifest", "Legal Control"].map(item => (
-              <span key={item} className="text-[10px] font-black text-zinc-600 hover:text-white uppercase tracking-widest cursor-pointer transition-colors">{item}</span>
+            {[
+              { label: "Case Study", href: "/case-study" },
+              { label: "Live Demo", href: "/" },
+              { label: "Datasets", href: "/datasets" },
+              { label: "Reports", href: "/reports" },
+            ].map(item => (
+              <Link key={item.label} href={item.href} className="text-[10px] font-black text-zinc-600 hover:text-white uppercase tracking-widest cursor-pointer transition-colors">{item.label}</Link>
             ))}
           </div>
           
-          <p className="text-zinc-800 text-[10px] font-bold uppercase tracking-[0.5em]">© 2026 Nexus Synthesis Corp.</p>
+          <p className="text-zinc-800 text-[10px] font-bold uppercase tracking-[0.5em]">2026 Portfolio Project</p>
         </div>
       </footer>
     </main>

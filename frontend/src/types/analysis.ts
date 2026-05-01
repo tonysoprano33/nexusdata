@@ -27,7 +27,7 @@ export interface ChartData {
   categories?: string[];
 }
 
-// ── New: cleaning report types ──────────────────────────────────────────────
+// Cleaning report types
 
 export interface CleaningAction {
   icon: string;
@@ -46,7 +46,7 @@ export interface CleaningReport {
   duplicates_removed: number;
 }
 
-// ── New: dataset DNA type ────────────────────────────────────────────────────
+// Dataset DNA type
 
 export interface DatasetDNA {
   total_rows: number;
@@ -60,7 +60,7 @@ export interface DatasetDNA {
   columns_list: string[];
 }
 
-// ── New: diff preview ────────────────────────────────────────────────────────
+// Diff preview
 
 export interface DiffChange {
   before: unknown;
@@ -74,7 +74,7 @@ export interface DiffRow {
   clean: Record<string, unknown>;
 }
 
-// ── Full analysis response ────────────────────────────────────────────────────
+// Full analysis response
 
 export interface AnalysisResponse {
   id?: string;
@@ -82,14 +82,14 @@ export interface AnalysisResponse {
   status: AnalysisStatus;
   error?: string;
   result?: {
-    // ── New preview / cleaning fields ──
+    // Preview and cleaning fields
     raw_preview?: Record<string, unknown>[];
     clean_preview?: Record<string, unknown>[];
     diff_preview?: DiffRow[];
     cleaning_report?: CleaningReport;
     dataset_dna?: DatasetDNA;
 
-    // ── Existing fields ──
+    // Core analysis fields
     summary: {
       total_rows: number;
       sampled_rows: number;

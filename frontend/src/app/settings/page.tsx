@@ -55,7 +55,7 @@ export default function SettingsPage() {
 
           <Tabs defaultValue="general" className="space-y-12">
             <TabsList className="bg-black border border-zinc-900 p-1 rounded-sm w-full h-auto flex gap-1">
-              {["general", "keys", "billing"].map((tab) => (
+              {["general", "keys", "portfolio"].map((tab) => (
                 <TabsTrigger 
                   key={tab} 
                   value={tab} 
@@ -77,11 +77,11 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                       <div className="space-y-3">
                         <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Full Name</label>
-                        <Input className="bg-zinc-950 border-zinc-900 h-12 rounded-sm text-sm text-white font-medium focus:border-zinc-700 outline-none ring-0 px-4" defaultValue="John Doe" />
+                        <Input className="bg-zinc-950 border-zinc-900 h-12 rounded-sm text-sm text-white font-medium focus:border-zinc-700 outline-none ring-0 px-4" defaultValue="Portfolio Analyst" />
                       </div>
                       <div className="space-y-3">
                         <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Neural ID / Email</label>
-                        <Input className="bg-zinc-950 border-zinc-900 h-12 rounded-sm text-sm text-white font-medium focus:border-zinc-700 outline-none ring-0 px-4" defaultValue="john@nexusdata.ai" />   
+                        <Input className="bg-zinc-950 border-zinc-900 h-12 rounded-sm text-sm text-white font-medium focus:border-zinc-700 outline-none ring-0 px-4" defaultValue="demo@nexusdata.local" />
                       </div>
                     </div>
                   </div>
@@ -113,11 +113,11 @@ export default function SettingsPage() {
                 <div className="lg:col-span-4 space-y-8">
                    <div className="p-8 border border-zinc-900 bg-zinc-950/30 text-center space-y-6">
                       <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-3xl font-black text-black mx-auto">
-                        JD
+                        PA
                       </div>
                       <div className="space-y-1">
-                        <h3 className="text-lg font-black uppercase tracking-tighter">John Doe</h3>
-                        <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">Administrator Node</p>
+                        <h3 className="text-lg font-black uppercase tracking-tighter">Portfolio Analyst</h3>
+                        <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">Demo workspace</p>
                       </div>
                       <Button variant="outline" className="w-full border-zinc-800 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-sm">Update Image</Button>
                    </div>
@@ -153,13 +153,13 @@ export default function SettingsPage() {
                   <CardInsight label="Security Protocol" className="mt-12 bg-zinc-950/50">
                     <div className="flex items-center gap-3">
                        <Shield className="w-4 h-4 text-emerald-500" />
-                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">AES-256 Bit Encryption Active on all data ingress points.</span>
+                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Keys stay in local environment variables and are never entered in the browser demo.</span>
                     </div>
                   </CardInsight>
                </div>
             </TabsContent>
 
-            <TabsContent value="billing" className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <TabsContent value="portfolio" className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="p-20 border border-zinc-900 bg-black text-center space-y-10 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-zinc-800/10 rounded-full blur-[100px] pointer-events-none" />
                 <div className="w-20 h-20 rounded-sm border border-zinc-800 bg-black flex items-center justify-center mx-auto shadow-2xl">
@@ -167,14 +167,14 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-zinc-900 border border-zinc-800">
-                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">Active Subscription Manifest</span>
+                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">Portfolio readiness</span>
                   </div>
-                  <h3 className="text-4xl font-black uppercase tracking-tighter">Nexus Pro Tier.</h3>
-                  <p className="text-zinc-500 max-w-sm mx-auto font-medium text-sm uppercase tracking-widest leading-loose">Unlimited Neural Clusters. High-Resolution Analysis. 4K Export Protocol.</p>
+                  <h3 className="text-4xl font-black uppercase tracking-tighter">CV Demo Mode.</h3>
+                  <p className="text-zinc-500 max-w-sm mx-auto font-medium text-sm uppercase tracking-widest leading-loose">Show upload, data quality, charting, chat, reports and portfolio metrics in one walkthrough.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                  <Button className="bg-white text-black font-black h-12 px-10 rounded-sm text-[10px] uppercase tracking-widest">Manage Billing</Button>
-                  <Button variant="outline" className="border-zinc-800 text-white font-black h-12 px-10 rounded-sm text-[10px] uppercase tracking-widest">Archive History</Button>
+                  <Button className="bg-white text-black font-black h-12 px-10 rounded-sm text-[10px] uppercase tracking-widest">Open Case Study</Button>
+                  <Button variant="outline" className="border-zinc-800 text-white font-black h-12 px-10 rounded-sm text-[10px] uppercase tracking-widest">Export Reports</Button>
                 </div>
               </div>
             </TabsContent>

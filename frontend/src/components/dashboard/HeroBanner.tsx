@@ -1,9 +1,7 @@
 "use client";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Eye, FileText, Share2, Upload, Activity } from "lucide-react";
+import { Eye, Upload, Activity } from "lucide-react";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
 
 interface HeroBannerProps {
   filename: string;
@@ -14,7 +12,6 @@ interface HeroBannerProps {
   rowsRemoved: number;
   improvement: number;
   statistics?: any;
-  datasetId: string;
   onScrollTo?: (sectionId: string) => void;
 }
 
@@ -27,20 +24,15 @@ export function HeroBanner({
   rowsRemoved,
   improvement,
   statistics,
-  datasetId,
   onScrollTo
 }: HeroBannerProps) {
   const router = useRouter();
   const minutesSaved = Math.ceil(totalRows * 0.12);
-  const timeSavedDisplay = minutesSaved < 60
-    ? `~${minutesSaved} min`
-    : `~${(minutesSaved / 60).toFixed(1)} hrs`;
 
   // Get missing values and duplicates from statistics if available
   const missingValues = statistics?.raw?.missing_values?.total || 0;
   const duplicatesRemoved = rowsRemoved > 0 ? rowsRemoved : 0;
   const dataReduction = totalRows > 0 ? ((rowsRemoved / totalRows) * 100).toFixed(1) : "0";
-  const improvementValue = qualityAfter - qualityBefore;
 
   return (
     <div className="space-y-6 mb-10">
@@ -67,7 +59,7 @@ export function HeroBanner({
             {/* Title and basic info */}
             <div>
               <h1 className="text-3xl font-black text-white truncate">{filename}</h1>
-              <p className="text-zinc-500 font-mono text-xs mt-2">{totalRows.toLocaleString()} rows • {totalColumns} columns</p>
+              <p className="text-zinc-500 font-mono text-xs mt-2">{totalRows.toLocaleString()} rows / {totalColumns} columns</p>
             </div>
             
             {/* Stats Grid - Valuable information, not generic */}
@@ -126,7 +118,7 @@ export function HeroBanner({
              <div className="text-center">
                 <p className="text-[10px] font-black uppercase text-zinc-600 tracking-widest mb-1">Health Score</p>
                 <div className="text-4xl font-black text-white">{qualityAfter}%</div>
-                <div className="text-[10px] text-emerald-400 font-bold mt-1">{qualityBefore}% → {qualityAfter}%</div>
+                <div className="text-[10px] text-emerald-400 font-bold mt-1">{qualityBefore}% to {qualityAfter}%</div>
                 <div className="text-[9px] text-zinc-500 mt-2">+{improvement}% improvement</div>
              </div>
           </div>

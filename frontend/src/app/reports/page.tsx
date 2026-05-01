@@ -9,12 +9,19 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
+import { buildApiUrl } from "@/lib/api";
+import { readCachedAnalyses } from "@/lib/analysis-cache";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nexusdata-api.onrender.com";
+type ReportItem = {
+  id: string;
+  filename: string;
+  created_at?: string | null;
+  status?: string;
+};
 
 export default function ReportsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [reports, setReports] = useState([]);
+  const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -27,9 +34,36 @@ export default function ReportsPage() {
     };
     handleResize();
     window.addEventListener("resize", handleResize);
-    axios.get(`${API_URL}/api/datasets/?limit=20&status=completed`)
-      .then(res => setReports(res.data))
-      .catch(err => console.error(err))
+    axios.get(buildApiUrl("/api/datasets/?limit=20&status=completed"))
+      .then((res) => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setReports(res.data);
+        } else {
+          setReports(
+            readCachedAnalyses()
+              .filter((item) => item.status === "completed")
+              .map((item) => ({
+                id: item.id,
+                filename: item.filename ?? "Dataset",
+                created_at: item.created_at,
+                status: item.status,
+              }))
+          );
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setReports(
+          readCachedAnalyses()
+            .filter((item) => item.status === "completed")
+            .map((item) => ({
+              id: item.id,
+              filename: item.filename ?? "Dataset",
+              created_at: item.created_at,
+              status: item.status,
+            }))
+        );
+      })
       .finally(() => setLoading(false));
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -38,7 +72,7 @@ export default function ReportsPage() {
     setDownloadingId(`${id}-${format}`);
     try {
       const response = await axios({
-        url: `${API_URL}/api/datasets/${id}/export/${format}`,
+        url: buildApiUrl(`/api/datasets/${id}/export/${format}`),
         method: 'GET',
         responseType: 'blob',
       });
@@ -105,7 +139,7 @@ export default function ReportsPage() {
             ) : (
               <div className="grid grid-cols-1 gap-6">
                 <AnimatePresence>
-                  {reports.map((report: any, i: number) => (
+                  {reports.map((report, i: number) => (
                     <motion.div
                       key={report.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -124,7 +158,10 @@ export default function ReportsPage() {
                                 <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest text-emerald-400">SYNCED</div>
                               </div>
                               <div className="flex flex-wrap items-center gap-6 text-[11px] font-black uppercase tracking-widest text-zinc-500">
-                                <span className="flex items-center gap-2"><Clock className="w-4 h-4 text-zinc-700" /> {new Date(report.created_at).toLocaleDateString()}</span>
+                                <span className="flex items-center gap-2">
+                                  <Clock className="w-4 h-4 text-zinc-700" />
+                                  {report.created_at ? new Date(report.created_at).toLocaleDateString() : "Sin fecha"}
+                                </span>
                                 <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-500/50" /> Secure Protocol</span>
                               </div>
                             </div>

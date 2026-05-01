@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight, Zap, Target, Users, Search, AlertTriangle } from "lucide-react";
+import { Sparkles, ArrowRight, Target, Users, Search, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QuickAction {

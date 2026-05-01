@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, GitMerge, Columns, CheckCircle2 } from "lucide-react";
+import { Columns, CheckCircle2, ClipboardCheck, DatabaseZap, GitCompareArrows, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getCleaningSteps } from "@/lib/business-intelligence";
 
 type Tab = "compare" | "raw" | "clean" | "diff" | "describe" | "info" | "top";
 
@@ -24,6 +25,7 @@ interface DataPreviewTabsProps {
   diffPreview?: DiffRow[];
   rawStats?: any;
   cleanStats?: any;
+  cleaningReport?: any;
 }
 
 function cellStr(val: unknown): string {
@@ -70,6 +72,88 @@ function HeadComparison({ raw = [], clean = [] }: { raw?: any[], clean?: any[] }
       <div className="bg-zinc-950 p-4">
         <h4 className="text-[10px] font-black uppercase text-emerald-400 mb-4">After (Cleaned)</h4>
         <PreviewTable data={clean.slice(0, 5)} />
+      </div>
+    </div>
+  );
+}
+
+function CleaningLogSummary({
+  report,
+  diffCount,
+}: {
+  report?: any;
+  diffCount: number;
+}) {
+  const log = getCleaningSteps(report);
+  const steps = Array.isArray(report?.steps) ? report.steps : [];
+  const getStepTotal = (key: string) =>
+    steps.reduce((total: number, step: any) => total + (Number(step?.[key]) || 0), 0);
+
+  const highlights = [
+    {
+      label: "Missing values fixed",
+      value: getStepTotal("fixed"),
+      icon: ClipboardCheck,
+      tone: "text-blue-300 bg-blue-500/10 border-blue-500/20",
+    },
+    {
+      label: "Duplicate rows removed",
+      value: getStepTotal("duplicates_removed") || report?.rows_removed || 0,
+      icon: DatabaseZap,
+      tone: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
+    },
+    {
+      label: "Columns standardized",
+      value: getStepTotal("columns_standardized"),
+      icon: Wrench,
+      tone: "text-purple-300 bg-purple-500/10 border-purple-500/20",
+    },
+    {
+      label: "Preview cell changes",
+      value: diffCount,
+      icon: GitCompareArrows,
+      tone: "text-amber-300 bg-amber-500/10 border-amber-500/20",
+    },
+  ];
+
+  return (
+    <div className="p-5 sm:p-6 border-b border-white/[0.06] bg-black/30 space-y-5">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 mb-2">
+            Before vs after cleaning
+          </div>
+          <h3 className="text-lg font-black text-white">What changed in the dataset?</h3>
+          <p className="text-sm text-zinc-500 mt-2 max-w-2xl">
+            Compare raw and cleaned records, then review the exact cleaning operations applied by the pipeline.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {highlights.map((item) => (
+          <div key={item.label} className={cn("rounded-sm border p-3", item.tone)}>
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-zinc-500">
+              <item.icon className="w-3.5 h-3.5" />
+              {item.label}
+            </div>
+            <div className="text-2xl font-black text-white mt-2">{Number(item.value).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-sm border border-zinc-900 bg-zinc-950/80 p-4">
+        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3">
+          Cleaning log
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {log.slice(0, 8).map((message) => (
+            <div key={message} className="flex items-start gap-2 text-xs text-zinc-300 leading-relaxed">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+              {message}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -316,7 +400,7 @@ function TopValuesTable({ preview }: { preview: any[] }) {
   );
 }
 
-export function DataPreviewTabs({ rawPreview = [], cleanPreview = [], diffPreview = [], rawStats, cleanStats }: DataPreviewTabsProps) {
+export function DataPreviewTabs({ rawPreview = [], cleanPreview = [], diffPreview = [], rawStats, cleanStats, cleaningReport }: DataPreviewTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("compare");
 
   useEffect(() => {
@@ -341,6 +425,7 @@ export function DataPreviewTabs({ rawPreview = [], cleanPreview = [], diffPrevie
 
   return (
     <div className="rounded-2xl border border-white/[0.07] bg-zinc-950/60 overflow-hidden">
+      <CleaningLogSummary report={cleaningReport} diffCount={totalChanges} />
       <div className="flex items-center gap-1 p-3 border-b border-white/[0.06] bg-zinc-950/40 overflow-x-auto">
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all", activeTab === tab.id ? "bg-white/10 text-white" : "text-zinc-600 hover:text-zinc-300")}>

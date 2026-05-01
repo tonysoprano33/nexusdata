@@ -1,12 +1,11 @@
 "use client";
-import { CheckCircle2, ShieldCheck, Zap, Database, ArrowUp, Minus, AlertCircle, TrendingUp } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Zap, Minus, TrendingUp } from "lucide-react";
 
 interface CleaningReportProps {
   report: any;
-  statistics?: any;
 }
 
-export function CleaningReport({ report, statistics }: CleaningReportProps) {
+export function CleaningReport({ report }: CleaningReportProps) {
   if (!report) return null;
 
   const improvement = report.improvement || (report.score_after - report.score_before);
@@ -17,7 +16,7 @@ export function CleaningReport({ report, statistics }: CleaningReportProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-6 bg-zinc-900/40 rounded-2xl border border-white/5">
-      {/* Health Score Before → After */}
+      {/* Health Score Before to After */}
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
           <ShieldCheck className="w-3 h-3 text-rose-400" /> Health Score Before
@@ -45,7 +44,7 @@ export function CleaningReport({ report, statistics }: CleaningReportProps) {
         </div>
         <div className="text-3xl font-black text-white">{rowsRemoved}</div>
         <p className="text-xs text-zinc-500 font-medium">
-          {originalRows.toLocaleString()} → {finalRows.toLocaleString()} rows
+          {originalRows.toLocaleString()} to {finalRows.toLocaleString()} rows
         </p>
       </div>
 

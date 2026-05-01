@@ -1,209 +1,142 @@
-# 🚀 NexusData AI
+# NexusData AI
 
-**Análisis de datos inteligente, 100% gratuito, impulsado por IA**
+Full-stack analytics platform for turning CSV, Excel and JSON files into cleaned datasets, executive insights, dashboards, chat-based exploration and exportable reports.
 
-Transforma cualquier CSV, Excel o JSON en insights accionables, visualizaciones automáticas y predicciones con Machine Learning - todo en menos de 10 segundos.
+This project is built as a portfolio-grade example for data analysis, automation and product building: it combines a FastAPI data pipeline, AI-assisted insight generation, automated cleaning, ML heuristics, a polished Next.js dashboard and deployment-ready configuration.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a393.svg)
-![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)
+## Why It Stands Out
 
-## ✨ Características Principales
+- End-to-end data workflow: upload, parse, clean, profile, analyze, visualize, chat and export.
+- AI provider strategy: Gemini/Groq support with a rule-based fallback so the app remains useful without external keys.
+- Analyst UX: dashboard sections for data quality, raw vs cleaned comparison, chart recommendations, advanced analytics and reports.
+- Automation mindset: generated PDF/PPTX reports, suggested questions, persisted analysis history and portfolio metrics.
+- Production shape: typed frontend, modular backend services, CORS setup, Vercel/Render/Railway config and local JSON fallback storage.
 
-### 🤖 Inteligencia Artificial Integrada
-- **Insights automáticos** - Gemini Flash analiza tus datos y genera hallazgos ejecutivos
-- **Chat con tu dataset** - Pregunta cualquier cosa en lenguaje natural
-- **Recomendación inteligente de gráficos** - La IA elige automáticamente las mejores visualizaciones
+## Tech Stack
 
-### 📊 Visualizaciones Avanzadas
-- 8 tipos de gráficos: Bar, Line, Scatter, Pie, Area, Histogram, Boxplot, Heatmap
-- Renderizado SVG custom para boxplots y heatmaps
-- Gráficos interactivos con Recharts
-- Insights de IA en cada visualización
+| Layer | Tools |
+| --- | --- |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS, Recharts, Framer Motion |
+| Backend | FastAPI, Pandas, NumPy, Scikit-learn, Pydantic |
+| AI | Gemini, Groq, deterministic rule-based fallback |
+| Persistence | Supabase when configured, local JSON storage fallback |
+| Reports | ReportLab PDF, python-pptx PowerPoint |
+| Deployment | Vercel frontend config, Render/Railway backend config |
 
-### 🔮 Análisis Predictivo Automático
-- **Detección de Churn** - Identifica clientes en riesgo automáticamente
-- **Segmentación RFM** - Segmenta por valor (Recency, Frequency, Monetary)
-- **Predicciones ML** - Regresión lineal con score R²
-- **Clustering K-means** - 4 grupos automáticos
+## Core Features
 
-### 📁 Múltiples Formatos
-- CSV (.csv)
-- Excel (.xlsx, .xls)
-- JSON (.json)
-- Detección automática de formato
+- Upload CSV, XLSX, XLS or JSON datasets.
+- Clean messy data and generate before/after quality scores.
+- Profile numeric, categorical and datetime columns.
+- Detect missing values, correlations and anomalies.
+- Generate automatic chart payloads for bar, line, area, scatter, histogram, boxplot, heatmap and pie views.
+- Produce executive insight narratives and recommended actions.
+- Run optional churn, RFM, regression and clustering signals when the schema supports them.
+- Ask natural-language questions about a stored dataset.
+- Export analysis as PDF or PowerPoint.
+- View real portfolio metrics at `/intelligence`.
 
-### 📑 Exportación Profesional
-- **PDF** - Reporte completo con insights y estadísticas
-- **PowerPoint** - 6 slides listos para presentar al jefe
-- Descarga directa desde el dashboard
+## Local Setup
 
-### ⚡ Performance
-- Dashboard listo en <10 segundos
-- Procesamiento asíncrono en background
-- Muestreo inteligente para datasets grandes (>100k filas)
-- Sin bloqueos de UI
-
-## 🎯 100% Gratis - Sin Límites
-
-- ✅ Sin suscripciones
-- ✅ Sin registro obligatorio
-- ✅ Sin límites de uso
-- ✅ Sin watermark
-- ✅ Código abierto
-
-## 🚀 Inicio Rápido
-
-### Requisitos
-- Python 3.10+
-- Node.js 18+
-- API Key de Gemini (gratis en [Google AI Studio](https://aistudio.google.com/app/apikey))
-
-### 1. Clonar y Configurar
-
-```bash
-git clone <repo-url>
-cd pipelines
-```
-
-### 2. Backend (FastAPI)
+### Backend
 
 ```powershell
 cd backend
-
-# Crear virtual environment
 python -m venv venv
-.\venv\Scripts\activate.ps1  # Windows
-source venv/bin/activate      # Linux/Mac
-
-# Instalar dependencias
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-
-# Configurar API Key
-echo "GEMINI_API_KEY=tu_api_key_aqui" > .env
-
-# Iniciar servidor
+copy .env.example .env
 python main.py
 ```
 
-Backend disponible en: http://localhost:8000
+Backend: `http://127.0.0.1:8000`
 
-### 3. Frontend (Next.js)
+### Frontend
 
 ```powershell
 cd frontend
-
-# Instalar dependencias
 npm install
-
-# Iniciar desarrollo
 npm run dev
 ```
 
-Frontend disponible en: http://localhost:3000
+Frontend: `http://localhost:3000`
 
-## 📖 Uso
+## Environment Variables
 
-### Subir un Archivo
+Backend:
 
-1. Arrastra tu CSV, Excel o JSON al área de drop
-2. Haz clic en "Generar Análisis con IA"
-3. Espera <10 segundos
-4. ¡Explora tu dashboard!
+```env
+GEMINI_API_KEY=
+GROQ_API_KEY=
+SUPABASE_URL=
+SUPABASE_KEY=
+APP_ENV=development
+```
 
-### Dashboard
+Frontend:
 
-El dashboard incluye:
-- **Resumen ejecutivo** - Filas, columnas, calidad de datos
-- **Insights de IA** - Hallazgos clave en formato ejecutivo
-- **Visualizaciones** - Gráficos recomendados automáticamente
-- **Chat** - Pregúntale cualquier cosa a tus datos
-- **Análisis avanzados** - Churn, RFM, Predicciones, Clustering
-- **Exportar** - PDF o PowerPoint listo para presentar
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
 
-### Chat con Dataset
+AI keys and Supabase are optional for local demos. Without AI keys, the backend still generates deterministic analyst-style insights.
 
-Escribe preguntas como:
-- "¿Cuál es el promedio de ventas?"
-- "¿Qué producto tiene más ingresos?"
-- "¿Hay correlación entre precio y cantidad vendida?"
-- "¿Cuántos valores faltantes hay?"
+## API Highlights
 
-## 📚 API Endpoints
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/health` | GET | Service health and degraded/healthy status |
+| `/api/providers` | GET | Available AI providers |
+| `/api/portfolio/metrics` | GET | Real project metrics for the portfolio dashboard |
+| `/api/datasets/` | GET | Analysis history |
+| `/api/datasets/upload` | POST | Upload and analyze a dataset |
+| `/api/datasets/{id}` | GET | Analysis detail |
+| `/api/datasets/{id}/chat` | POST | Ask a question about a dataset |
+| `/api/datasets/{id}/export/pdf` | GET | Export PDF |
+| `/api/datasets/{id}/export/pptx` | GET | Export PowerPoint |
 
-| Endpoint | Método | Descripción |
-|----------|--------|-------------|
-| `/` | GET | Health check |
-| `/api/datasets/` | GET | Listar análisis |
-| `/api/datasets/upload` | POST | Subir archivo |
-| `/api/datasets/{id}` | GET | Obtener análisis |
-| `/api/datasets/{id}/export/pdf` | GET | Exportar PDF |
-| `/api/datasets/{id}/export/pptx` | GET | Exportar PowerPoint |
-| `/api/datasets/{id}/chat` | POST | Chat con dataset |
-| `/api/datasets/{id}/chat/questions` | GET | Preguntas sugeridas |
+## Suggested Demo Flow
 
-Ver [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) para más detalles.
+1. Start backend and frontend.
+2. Upload `example_dataset.csv`.
+3. Open the generated dashboard.
+4. Show quality score changes, raw vs cleaned preview and chart recommendations.
+5. Ask a dataset question in the chat panel.
+6. Export a PDF or PowerPoint report.
+7. Open `/intelligence` to show live portfolio metrics.
 
-## 🏗️ Arquitectura
+## Architecture
 
-### Backend (Python)
-- **FastAPI** - Framework web de alto rendimiento
-- **Pandas** - Manipulación de datos
-- **Scikit-learn** - ML (anomalías, clustering, regresión)
-- **Gemini API** - Insights y chat con IA
-- **SQLite** - Almacenamiento local
-- **ReportLab** - Generación PDF
-- **Python-pptx** - Generación PowerPoint
+```mermaid
+flowchart LR
+  User["User uploads file"] --> Frontend["Next.js dashboard"]
+  Frontend --> API["FastAPI routes"]
+  API --> Parser["Pandas parser"]
+  Parser --> Cleaner["Cleaning service"]
+  Cleaner --> Stats["Stats + ML analytics"]
+  Stats --> AI["Gemini/Groq or fallback insights"]
+  AI --> Store["Supabase or local JSON"]
+  Store --> Dashboard["Dashboard, chat and reports"]
+```
 
-### Frontend (Next.js + React)
-- **Next.js 14** - Framework React
-- **Tailwind CSS** - Estilos utility-first
-- **Framer Motion** - Animaciones
-- **Recharts** - Visualizaciones
-- **React Markdown** - Renderizado de insights
+## CV Positioning
 
-## 🎨 Capturas de Pantalla
+This project demonstrates that I can build analyst tools from zero: data ingestion, cleaning logic, statistical profiling, AI integration, UI design, report automation, API design and deploy-ready packaging.
 
-*Próximamente*
+Suggested CV bullet:
 
-## 🤝 Contribuir
+> Built NexusData AI, a full-stack analytics automation platform that transforms raw CSV/Excel/JSON datasets into cleaned data, quality scores, AI insights, dashboards, dataset chat and PDF/PPTX reports using FastAPI, Pandas, Scikit-learn, Next.js and TypeScript.
 
-Las contribuciones son bienvenidas:
+## Verification
 
-1. Fork el proyecto
-2. Crea tu branch (`git checkout -b feature/nueva-feature`)
-3. Commit tus cambios (`git commit -m 'Add: nueva feature'`)
-4. Push a la branch (`git push origin feature/nueva-feature`)
-5. Abre un Pull Request
+```powershell
+cd frontend
+npm run build
+```
 
-## 📝 Roadmap
+```powershell
+cd backend
+python -m pytest
+```
 
-- [x] Soporte CSV, Excel, JSON
-- [x] Insights con Gemini
-- [x] Visualizaciones automáticas (8 tipos)
-- [x] Chat con dataset
-- [x] Exportar PDF/PowerPoint
-- [x] Análisis avanzados (Churn, RFM, ML, Clustering)
-- [x] Dashboard premium con animaciones
-- [ ] Autenticación JWT completa
-- [ ] Soporte múltiples datasets comparativos
-- [ ] API pública con rate limiting
-- [ ] Webhook notifications
-
-## 📄 Licencia
-
-MIT License - ver [LICENSE](./LICENSE) para más detalles.
-
-## 🙏 Agradecimientos
-
-- Google Gemini por la API de IA
-- FastAPI por el framework backend
-- Vercel por Next.js
-- Comunidad open source
-
----
-
-**Hecho con ❤️ y ☕ por un solo desarrollador trabajando toda la noche**
-
-*¿Preguntas? Abre un issue o conecta conmigo.*
+The repository also includes PowerShell scripts for manual backend upload testing.

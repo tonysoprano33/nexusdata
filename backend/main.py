@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
+import os
 import sys
 import traceback
 
@@ -19,6 +20,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+API_PREFIX = "" if os.environ.get("VERCEL") else "/api"
 
 
 @asynccontextmanager
@@ -94,7 +96,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Include API routes
-app.include_router(router, prefix="/api")
+app.include_router(router, prefix=API_PREFIX)
 
 
 @app.get("/")

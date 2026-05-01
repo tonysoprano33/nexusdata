@@ -1,43 +1,80 @@
 "use client";
-import { useState, useEffect } from "react";
+
+import { useEffect, useState } from "react";
 import { MessageSquare, Loader2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import axios from "axios";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { buildApiUrl } from "@/lib/api";
+
 export function ChatDataset({ datasetId }: { datasetId: string }) {
-  const [messages, setMessages] = useState<Array<{id: string; type: 'user' | 'bot'; content: string}>>([]);     
+  const [messages, setMessages] = useState<Array<{ id: string; type: "user" | "bot"; content: string }>>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([
+    "What are the main quality issues that were fixed?",
+    "Which variables show the strongest relationships?",
+    "What business action should I prioritize first?",
+  ]);
 
   const sendMessage = async (question: string) => {
     if (!question.trim()) return;
-    const userMsg = { id: Date.now().toString(), type: 'user' as const, content: question };
-    setMessages(prev => [...prev, userMsg]);
+
+    const userMsg = { id: Date.now().toString(), type: "user" as const, content: question };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://nexusdata-api.onrender.com";
-      const { data } = await axios.post(`${API_BASE}/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`);
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: data.answer }]);   
+      const { data } = await axios.post(
+        buildApiUrl(`/api/datasets/${datasetId}/chat?question=${encodeURIComponent(question)}`)
+      );
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), type: "bot", content: data.answer },
+      ]);
     } catch {
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), type: 'bot', content: "Error processing your question. Please try again." }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          type: "bot",
+          content: "No pude responder en este momento. Intenta reformular la pregunta o reintenta en unos segundos.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const handleQuickAction = (e: any) => {
-        if (e.detail?.prompt) {
-            sendMessage(e.detail.prompt);
+    const loadSuggestions = async () => {
+      try {
+        const { data } = await axios.get(buildApiUrl(`/api/datasets/${datasetId}/chat/questions`));
+        if (Array.isArray(data?.questions) && data.questions.length > 0) {
+          setSuggestions(data.questions);
         }
+      } catch (error) {
+        console.error("Failed to load suggestions:", error);
+      }
     };
-    window.addEventListener("quick-analysis", handleQuickAction);
-    return () => window.removeEventListener("quick-analysis", handleQuickAction);
+
+    loadSuggestions();
+  }, [datasetId]);
+
+  useEffect(() => {
+    const handleQuickAction = (event: Event) => {
+      const customEvent = event as CustomEvent<{ prompt?: string }>;
+      if (customEvent.detail?.prompt) {
+        sendMessage(customEvent.detail.prompt);
+      }
+    };
+
+    window.addEventListener("quick-analysis", handleQuickAction as EventListener);
+    return () => window.removeEventListener("quick-analysis", handleQuickAction as EventListener);
   }, [datasetId]);
 
   return (
@@ -53,19 +90,34 @@ export function ChatDataset({ datasetId }: { datasetId: string }) {
         <ScrollArea className="flex-1 p-4">
           {messages.length === 0 ? (
             <div className="space-y-2">
-              <p className="text-neutral-500 text-xs text-center mb-4">Ask questions about your data in natural language</p>
-              {["What's the average value?", "Show me trends over time", "Any correlations found?"].map((q, i) => (
-                <button key={i} onClick={() => sendMessage(q)} className="w-full text-left p-2 rounded bg-white/[0.04] hover:bg-white/[0.08] text-xs text-neutral-300 transition-colors border border-white/5">
-                  {q}
+              <p className="text-neutral-500 text-xs text-center mb-4">
+                Ask questions about your data in natural language
+              </p>
+              {suggestions.slice(0, 4).map((question, index) => (
+                <button
+                  key={`${question}-${index}`}
+                  onClick={() => sendMessage(question)}
+                  className="w-full text-left p-2 rounded bg-white/[0.04] hover:bg-white/[0.08] text-xs text-neutral-300 transition-colors border border-white/5"
+                >
+                  {question}
                 </button>
               ))}
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>  
-                  <div className={`max-w-[85%] p-3 rounded-xl text-xs ${msg.type === 'user' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-neutral-800 text-neutral-200 border border-white/5'}`}>
-                    {msg.content}
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] p-3 rounded-xl text-xs ${
+                      message.type === "user"
+                        ? "bg-indigo-600 text-white shadow-lg"
+                        : "bg-neutral-800 text-neutral-200 border border-white/5"
+                    }`}
+                  >
+                    {message.content}
                   </div>
                 </div>
               ))}
@@ -83,12 +135,17 @@ export function ChatDataset({ datasetId }: { datasetId: string }) {
           <div className="flex gap-2">
             <input
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage(input)}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && sendMessage(input)}
               placeholder="Ask anything..."
               className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
             />
-            <Button size="sm" onClick={() => sendMessage(input)} disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 h-9 px-4">
+            <Button
+              size="sm"
+              onClick={() => sendMessage(input)}
+              disabled={loading}
+              className="bg-indigo-600 hover:bg-indigo-500 h-9 px-4"
+            >
               Send
             </Button>
           </div>

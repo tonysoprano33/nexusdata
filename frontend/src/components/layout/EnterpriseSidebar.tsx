@@ -1,7 +1,6 @@
 ﻿"use client";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Database, Brain, FileText, Settings, ChevronLeft, ChevronRight, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, Database, Brain, FileText, Settings, ChevronLeft, ChevronRight, BriefcaseBusiness, Shield } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +8,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Datasets", href: "/datasets", icon: Database },
   { name: "Intelligence", href: "/intelligence", icon: Brain },
+  { name: "Case Study", href: "/case-study", icon: BriefcaseBusiness },
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

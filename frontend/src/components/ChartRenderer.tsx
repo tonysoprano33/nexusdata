@@ -23,6 +23,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Lightbulb } from "lucide-react";
+import { buildChartStory } from "@/lib/business-intelligence";
 
 interface ChartData {
   type: string;
@@ -51,6 +52,7 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308'
 
 export default function ChartRenderer({ chartData, index }: ChartRendererProps) {
   const { type, title, insight, x, y, labels, values, data, categories } = chartData;
+  const story = buildChartStory(chartData);
 
   const renderChart = () => {
     switch (type) {
@@ -223,7 +225,7 @@ export default function ChartRenderer({ chartData, index }: ChartRendererProps) 
         }
         return (
           <div className="h-[300px] flex items-center justify-center text-neutral-500">
-            Datos insuficientes para boxplot
+            Not enough data for a boxplot
           </div>
         );
 
@@ -240,7 +242,7 @@ export default function ChartRenderer({ chartData, index }: ChartRendererProps) 
         }
         return (
           <div className="h-[300px] flex items-center justify-center text-neutral-500">
-            Datos insuficientes para heatmap
+            Not enough data for a heatmap
           </div>
         );
 
@@ -256,14 +258,14 @@ export default function ChartRenderer({ chartData, index }: ChartRendererProps) 
         }
         return (
           <div className="h-[300px] flex items-center justify-center text-neutral-500">
-            Datos insuficientes para histogram
+            Not enough data for a histogram
           </div>
         );
 
       default:
         return (
           <div className="h-[300px] flex items-center justify-center text-neutral-500">
-            Tipo de gráfico no soportado: {type}
+            Unsupported chart type: {type}
           </div>
         );
     }
@@ -281,12 +283,10 @@ export default function ChartRenderer({ chartData, index }: ChartRendererProps) 
             {type}
           </Badge>
         </div>
-        {insight && (
-          <CardDescription className="flex items-center gap-2 text-sm text-neutral-400 mt-2">
-            <Lightbulb className="h-4 w-4 text-amber-400" />
-            {insight}
-          </CardDescription>
-        )}
+        <CardDescription className="flex items-start gap-2 text-sm text-neutral-400 mt-2 leading-relaxed">
+          <Lightbulb className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+          <span>{story || insight}</span>
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {renderChart()}

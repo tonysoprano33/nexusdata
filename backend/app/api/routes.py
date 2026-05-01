@@ -1,15 +1,15 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Query
-from fastapi.responses import JSONResponse
-from typing import Optional, List
-from app.services.analysis_service import AnalysisService
-from app.models.schemas import (
-    DatasetAnalysisResponse, 
-    AnalysisRequest, 
-    HealthResponse,
-    AnalysisResult
-)
+from __future__ import annotations
+
 import logging
 import traceback
+from typing import Optional
+
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import Response
+
+from app.demo_dataset import DEMO_DATASET_CSV, DEMO_DATASET_FILENAME
+from app.models.schemas import HealthResponse
+from app.services.analysis_service import AnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +22,7 @@ async def health_check():
     """Health check endpoint."""
     providers = analysis_service.get_available_providers()
     status = "healthy" if any(providers.values()) else "degraded"
-    
-    return HealthResponse(
-        status=status,
-        version="1.0.0"
-    )
+    return HealthResponse(status=status, version="1.0.0")
 
 
 @router.get("/providers")
@@ -35,388 +31,218 @@ async def get_providers():
     return analysis_service.get_available_providers()
 
 
+@router.get("/portfolio/metrics")
+async def get_portfolio_metrics():
+    """Expose portfolio-friendly project metrics computed from stored analyses."""
+    return await analysis_service.get_portfolio_metrics()
+
+
 @router.post("/analyze", response_model=dict)
 async def analyze_dataset(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     provider: str = Form("gemini"),
-    prompt: Optional[str] = Form(None)
+    prompt: Optional[str] = Form(None),
 ):
     """Upload and analyze a dataset."""
-    
-    # Validate provider
-    available_providers = analysis_service.get_available_providers()
-    if provider not in available_providers or not available_providers[provider]:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Provider '{provider}' is not available"
-        )
-    
-    # Validate file
-    allowed_extensions = ('.csv', '.xlsx', '.xls', '.json')
-    if not file.filename.endswith(allowed_extensions):
-        raise HTTPException(
-            status_code=400,
-            detail=f"File must be one of: {', '.join(allowed_extensions)}"
-        )
-    
-    try:
-        # Read file content
-        content = await file.read()
-        
-        if len(content) == 0:
-            raise HTTPException(status_code=400, detail="Empty file")
-        
-        # Limit file size (100MB)
-        if len(content) > 100 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large (max 100MB)")
-        
-        # Perform analysis
-        result = await analysis_service.upload_and_analyze(
-            content,
-            file.filename,
-            provider,
-            prompt
-        )
-        
-        return result
-        
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Analysis error: {e}")
-        raise HTTPException(status_code=500, detail="Analysis failed")
+    return await _handle_upload(file=file, provider=provider, prompt=prompt)
 
 
 @router.get("/analysis/{analysis_id}")
 async def get_analysis(analysis_id: str):
     """Get analysis result by ID."""
-    try:
-        result = await analysis_service.get_analysis(analysis_id)
-        if not result:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving analysis: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve analysis")
+    result = await analysis_service.get_analysis(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return result
 
 
 @router.get("/analyses")
-async def list_analyses(limit: int = 100):
-    """List all analyses."""
-    try:
-        analyses = await analysis_service.list_analyses(limit)
-        return {"analyses": analyses}
-    except Exception as e:
-        logger.error(f"Error listing analyses: {e}")
-        raise HTTPException(status_code=500, detail="Failed to list analyses")
+async def list_analyses(limit: int = 100, status: Optional[str] = None):
+    """List analyses with optional status filtering."""
+    analyses = await analysis_service.list_analyses(limit)
+    if status:
+        analyses = [item for item in analyses if item.get("status") == status]
+    return {"analyses": analyses}
 
 
-# Legacy endpoints for frontend compatibility
 @router.get("/datasets/")
-async def list_datasets_legacy(limit: int = 24):
-    """Legacy endpoint - returns array directly for frontend compatibility."""
-    try:
-        analyses = await analysis_service.list_analyses(limit)
-        # Format each item for frontend
-        formatted = []
-        for item in analyses if analyses else []:
-            analysis_result = item.get("analysis_result", {})
-            formatted.append({
-                "id": item.get("id"),
-                "filename": item.get("filename"),
-                "status": item.get("status"),
-                "created_at": item.get("created_at"),
-                "updated_at": item.get("updated_at"),
-                "insights": analysis_result.get("insights", "")[:200] + "..." if len(analysis_result.get("insights", "")) > 200 else analysis_result.get("insights", ""),
-                "summary": analysis_result.get("summary", "")
-            })
-        return formatted
-    except Exception as e:
-        logger.error(f"Error listing datasets: {e}")
-        return []
+async def list_datasets_legacy(limit: int = 24, status: Optional[str] = None):
+    """Frontend-friendly dataset history endpoint."""
+    analyses = await analysis_service.list_analyses(limit)
+    if status:
+        analyses = [item for item in analyses if item.get("status") == status]
+
+    formatted = []
+    for item in analyses:
+        normalized = analysis_service.normalize_analysis_record(item)
+        result = normalized.get("result", {})
+        summary = result.get("summary", {})
+        cleaning = result.get("cleaning_report", {})
+        insights = result.get("business_insights") or result.get("insights") or ""
+
+        formatted.append(
+            {
+                "id": normalized.get("id"),
+                "filename": normalized.get("filename"),
+                "status": normalized.get("status"),
+                "created_at": normalized.get("created_at"),
+                "updated_at": normalized.get("updated_at"),
+                "data_quality_score": cleaning.get("score_after"),
+                "summary": {
+                    "total_rows": summary.get("total_rows", 0),
+                    "total_columns": summary.get("total_columns", 0),
+                },
+                "insights": insights[:220] + "..." if len(insights) > 220 else insights,
+            }
+        )
+    return formatted
+
+
+@router.post("/datasets/demo")
+async def create_demo_dataset(provider: str = Query("auto")):
+    """Create a portfolio demo analysis from a bundled business dataset."""
+    if provider not in {"gemini", "groq", "auto"}:
+        raise HTTPException(status_code=400, detail="Provider must be gemini, groq, or auto")
+
+    prompt = (
+        "This is a portfolio demo dataset about customer revenue, order volume, "
+        "satisfaction, churn risk, and recency. Prioritize executive summary, "
+        "business recommendations, cleaning decisions, and analyst limitations."
+    )
+    return await analysis_service.upload_and_analyze(
+        DEMO_DATASET_CSV.encode("utf-8"),
+        DEMO_DATASET_FILENAME,
+        provider,
+        prompt,
+    )
 
 
 @router.get("/datasets/{dataset_id}")
 async def get_dataset_legacy(dataset_id: str):
-    """Legacy endpoint - get dataset by ID with complete info."""
-    try:
-        result = await analysis_service.get_analysis(dataset_id)
-        if not result:
-            raise HTTPException(status_code=404, detail="Dataset not found")
-        
-        # Format for frontend - wrap in result object as expected
-        analysis_result = result.get("analysis_result", {})
-        stats = analysis_result.get("statistics", {})
-        cleaning_report = analysis_result.get("cleaning_report", {})
-        raw_preview = analysis_result.get("raw_preview", [])
-        clean_preview = analysis_result.get("clean_preview", [])
-        
-        return {
-            "id": result.get("id"),
-            "filename": result.get("filename"),
-            "status": result.get("status"),
-            "created_at": result.get("created_at"),
-            "updated_at": result.get("updated_at"),
-            "result": {
-                "dataset_dna": {
-                    "total_rows": cleaning_report.get("final_rows", stats.get("total_rows", 0)),
-                    "total_columns": stats.get("total_columns", 0),
-                },
-                "cleaning_report": {
-                    "score_before": cleaning_report.get("score_before", 0),
-                    "score_after": cleaning_report.get("score_after", 0),
-                    "rows_removed": cleaning_report.get("rows_removed", 0),
-                    "original_rows": cleaning_report.get("original_rows", stats.get("total_rows", 0)),
-                    "final_rows": cleaning_report.get("final_rows", stats.get("total_rows", 0)),
-                    "improvement": cleaning_report.get("improvement", 0),
-                    "changes_made": cleaning_report.get("changes_made", [])
-                },
-                "business_insights": analysis_result.get("insights", ""),
-                "raw_preview": raw_preview,
-                "clean_preview": clean_preview,
-                "chart_recommendations": [],
-                "charts_data": [],
-                "insights": analysis_result.get("insights", ""),
-                "recommendations": analysis_result.get("recommendations", []),
-                "summary": analysis_result.get("summary", ""),
-                "statistics": stats
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving dataset: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve dataset")
+    """Frontend-friendly dataset detail endpoint."""
+    result = await analysis_service.get_analysis(dataset_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    return analysis_service.normalize_analysis_record(result)
 
 
 @router.post("/datasets/upload")
 async def upload_dataset_legacy(
     file: UploadFile = File(...),
-    provider: str = Form("gemini")
+    provider: str = Form("gemini"),
 ):
-    """Legacy endpoint - upload and analyze dataset."""
-    import math
-    
-    # Helper to clean NaN/Inf for JSON
-    def clean_for_json(obj):
-        if isinstance(obj, dict):
-            return {k: clean_for_json(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [clean_for_json(v) for v in obj]
-        elif isinstance(obj, float):
-            if math.isnan(obj) or math.isinf(obj):
-                return None
-            return obj
-        return obj
-    
-    logger.info(f"=== UPLOAD START ===")
-    logger.info(f"File: {file.filename}, Provider: {provider}")
-    
-    import pandas as pd
-    import io
-    
-    # Validate file extension
-    allowed = ('.csv', '.xlsx', '.xls', '.json')
-    if not file.filename.endswith(allowed):
-        logger.error(f"Invalid file extension: {file.filename}")
-        raise HTTPException(400, f"File must be: {', '.join(allowed)}")
-    
-    try:
-        # Read file
-        logger.info("Step 1: Reading file...")
-        content = await file.read()
-        logger.info(f"Step 1 complete: {len(content)} bytes read")
-        
-        if len(content) == 0:
-            raise HTTPException(400, "Empty file")
-        
-        if len(content) > 50 * 1024 * 1024:  # 50MB limit
-            raise HTTPException(400, "File too large (max 50MB)")
-        
-        # Parse dataframe for metadata
-        logger.info("Step 2: Parsing DataFrame...")
-        try:
-            if file.filename.endswith('.csv'):
-                df = pd.read_csv(io.BytesIO(content))
-            elif file.filename.endswith(('.xlsx', '.xls')):
-                df = pd.read_excel(io.BytesIO(content))
-            elif file.filename.endswith('.json'):
-                df = pd.read_json(io.BytesIO(content))
-            else:
-                df = pd.DataFrame()
-            
-            columns = df.columns.tolist()
-            row_count = len(df)
-            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-            
-            # Convert to dict and clean NaN values
-            raw_preview = df.head(10).to_dict(orient='records')
-            preview = clean_for_json(raw_preview)
-            
-            logger.info(f"Step 2 complete: {row_count} rows, {len(columns)} columns")
-        except Exception as parse_err:
-            logger.error(f"Step 2 FAILED: {parse_err}")
-            columns, row_count, numeric_cols, categorical_cols, preview = [], 0, [], [], []
-        
-        # Use default provider if not available
-        logger.info("Step 3: Checking providers...")
-        available = analysis_service.get_available_providers()
-        logger.info(f"Available providers: {available}")
-        if not available.get(provider):
-            old_provider = provider
-            provider = "gemini" if available.get("gemini") else "groq"
-            logger.info(f"Provider switched from {old_provider} to {provider}")
-        
-        # Analyze
-        logger.info(f"Step 4: Starting analysis with {provider}...")
-        result = await analysis_service.upload_and_analyze(
-            content, file.filename, provider, None, preview
-        )
-        logger.info(f"Step 4 complete: ID={result.get('id')}, Status={result.get('status')}")
-        
-        # Result from analysis_service has: id, status, result (containing insights), fallback_used
-        analysis_data = result.get("result", {}) or {}
-        
-        logger.info(f"Analysis data keys: {analysis_data.keys() if analysis_data else 'EMPTY'}")
-        logger.info(f"Insights length: {len(analysis_data.get('insights', ''))}")
-        
-        # Build response
-        response = {
-            "id": result.get("id"),
-            "filename": file.filename,
-            "status": result.get("status"),
-            "insights": analysis_data.get("insights", ""),
-            "recommendations": analysis_data.get("recommendations", []),
-            "summary": analysis_data.get("summary", ""),
-            "statistics": analysis_data.get("statistics", {}),
-            "row_count": row_count,
-            "columns": columns,
-            "numeric_columns": numeric_cols,
-            "categorical_columns": categorical_cols,
-            "preview": preview,
-            "fallback_used": result.get("fallback_used", False),
-            "provider_used": provider
-        }
-        
-        # Clean any NaN/Inf values for JSON
-        clean_response = clean_for_json(response)
-        logger.info(f"Step 5: Response ready with {len(clean_response.get('insights', ''))} chars insights")
-        
-        # Extract cleaning report from analysis data
-        cleaning_report = analysis_data.get("cleaning_report", {})
-        raw_preview = analysis_data.get("raw_preview", [])
-        clean_preview = analysis_data.get("clean_preview", [])
-        
-        # Return in format expected by frontend
-        return {
-            "id": result.get("id"),
-            "filename": file.filename,
-            "status": result.get("status"),
-            "result": {
-                "dataset_dna": {
-                    "total_rows": cleaning_report.get("final_rows", row_count),
-                    "total_columns": len(columns),
-                },
-                "cleaning_report": {
-                    "score_before": cleaning_report.get("score_before", 0),
-                    "score_after": cleaning_report.get("score_after", 0),
-                    "rows_removed": cleaning_report.get("rows_removed", 0),
-                    "original_rows": cleaning_report.get("original_rows", row_count),
-                    "final_rows": cleaning_report.get("final_rows", row_count),
-                    "improvement": cleaning_report.get("improvement", 0),
-                    "changes_made": cleaning_report.get("changes_made", [])
-                },
-                "business_insights": analysis_data.get("insights", ""),
-                "raw_preview": raw_preview,
-                "clean_preview": clean_preview,
-                "chart_recommendations": [],
-                "charts_data": [],
-                "insights": analysis_data.get("insights", ""),
-                "recommendations": analysis_data.get("recommendations", []),
-                "summary": analysis_data.get("summary", ""),
-                "statistics": analysis_data.get("statistics", {})
-            },
-            "fallback_used": result.get("fallback_used", False),
-            "provider_used": provider
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Upload failed: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(500, f"Upload failed: {str(e)}")
+    """Upload and analyze dataset for the current frontend."""
+    return await _handle_upload(file=file, provider=provider, prompt=None)
 
 
 @router.post("/datasets/{dataset_id}/chat")
 async def chat_with_dataset_legacy(
     dataset_id: str,
     question: str = Query(..., description="Question to ask about the dataset"),
-    provider: str = Query("gemini", description="AI provider to use")
 ):
-    """Legacy endpoint - chat with dataset analysis results."""
+    """Chat with a dataset using stored artifacts."""
     try:
-        # Get the analysis result
-        result = await analysis_service.get_analysis(dataset_id)
-        if not result:
-            raise HTTPException(status_code=404, detail="Dataset not found")
-        
-        # Return a simple response based on the analysis
-        analysis_data = result.get("analysis_result", {})
-        insights = analysis_data.get("insights", "")
-        
-        return {
-            "answer": f"Based on the analysis: {insights[:500]}..." if len(insights) > 500 else f"Based on the analysis: {insights}",
-            "dataset_id": dataset_id,
-            "question": question
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in chat: {e}")
-        raise HTTPException(status_code=500, detail="Chat failed")
+        return await analysis_service.answer_dataset_question(dataset_id, question)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Error in chat: %s", exc)
+        raise HTTPException(status_code=500, detail="Chat failed") from exc
+
+
+@router.get("/datasets/{dataset_id}/chat/questions")
+async def get_chat_questions(dataset_id: str):
+    """Suggested chat prompts for the dataset."""
+    return {"questions": await analysis_service.get_suggested_questions(dataset_id)}
+
+
+@router.get("/datasets/{dataset_id}/export/pdf")
+async def export_dataset_pdf(dataset_id: str):
+    """Export dataset report as PDF."""
+    try:
+        payload = await analysis_service.generate_pdf_report(dataset_id)
+        return Response(
+            content=payload,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="report-{dataset_id[:8]}.pdf"'},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("PDF export failed: %s", exc)
+        raise HTTPException(status_code=500, detail="PDF export failed") from exc
+
+
+@router.get("/datasets/{dataset_id}/export/pptx")
+async def export_dataset_pptx(dataset_id: str):
+    """Export dataset report as PowerPoint."""
+    try:
+        payload = await analysis_service.generate_pptx_report(dataset_id)
+        return Response(
+            content=payload,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f'attachment; filename="report-{dataset_id[:8]}.pptx"'},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("PPTX export failed: %s", exc)
+        raise HTTPException(status_code=500, detail="PPTX export failed") from exc
 
 
 @router.delete("/datasets/{dataset_id}")
 async def delete_dataset_legacy(dataset_id: str):
-    """Legacy endpoint - delete a specific dataset by ID."""
-    try:
-        deleted = await analysis_service.delete_analysis(dataset_id)
-        if not deleted:
-            raise HTTPException(status_code=404, detail="Dataset not found or could not be deleted")
-        return {
-            "success": True,
-            "message": f"Dataset {dataset_id} deleted successfully",
-            "id": dataset_id
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting dataset: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete dataset")
+    """Delete a specific dataset by ID."""
+    deleted = await analysis_service.delete_analysis(dataset_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Dataset not found or could not be deleted")
+    return {"success": True, "message": f"Dataset {dataset_id} deleted successfully", "id": dataset_id}
 
 
 @router.delete("/datasets/")
-async def delete_all_datasets_legacy(confirm: bool = Query(False, description="Set to true to confirm deletion of all datasets")):
-    """Legacy endpoint - delete all datasets. Requires confirmation."""
+async def delete_all_datasets_legacy(
+    confirm: bool = Query(False, description="Set to true to confirm deletion of all datasets"),
+):
+    """Delete all datasets. Requires explicit confirmation."""
     if not confirm:
+        raise HTTPException(status_code=400, detail="Add ?confirm=true to confirm deletion of all datasets")
+
+    count = await analysis_service.delete_all_analyses()
+    return {"success": True, "message": f"Deleted {count} datasets", "count": count}
+
+
+async def _handle_upload(file: UploadFile, provider: str, prompt: Optional[str]) -> dict:
+    """Shared upload handler with consistent validation and error mapping."""
+    allowed_extensions = (".csv", ".xlsx", ".xls", ".json")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing file name")
+    if not file.filename.endswith(allowed_extensions):
         raise HTTPException(
-            status_code=400, 
-            detail="Add ?confirm=true to confirm deletion of all datasets"
+            status_code=400,
+            detail=f"File must be one of: {', '.join(allowed_extensions)}",
         )
-    
+    if provider not in {"gemini", "groq", "auto"}:
+        raise HTTPException(status_code=400, detail="Provider must be gemini, groq, or auto")
+
     try:
-        count = await analysis_service.delete_all_analyses()
-        return {
-            "success": True,
-            "message": f"Deleted {count} datasets",
-            "count": count
-        }
-    except Exception as e:
-        logger.error(f"Error deleting all datasets: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete datasets")
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty file")
+        if len(content) > 100 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 100MB)")
+        return await analysis_service.upload_and_analyze(content, file.filename, provider, prompt)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.error("Validation error: %s", exc)
+        message = str(exc)
+        if "parse" in message.lower() or "tokenizing" in message.lower():
+            message = (
+                "We couldn't read this file. Please check that it uses a valid delimiter, "
+                "contains at least one header row, and is not password protected."
+            )
+        raise HTTPException(status_code=400, detail=message) from exc
+    except Exception as exc:
+        logger.error("Upload failed: %s", exc)
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}") from exc

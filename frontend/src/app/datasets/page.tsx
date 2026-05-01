@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { EnterpriseSidebar } from "@/components/layout/EnterpriseSidebar";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { AnalysisHistory } from "@/components/landing/AnalysisHistory";
-import { Card, CardHeader, CardTitle, CardInsight } from "@/components/ui/card";
+import { Card, CardInsight } from "@/components/ui/card";
 import {
   Database,
   Plus,
@@ -13,12 +13,15 @@ import {
   BarChart3,
   FileSearch,
   ArrowRight,
+  type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { DemoDatasetButton } from "@/components/landing/DemoDatasetButton";
 
 type ViewMode = "grid" | "list";
+type StatColor = "blue" | "indigo" | "emerald";
 
 function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) {
   return (
@@ -46,8 +49,20 @@ function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (v: ViewMo
   );
 }
 
-function StatCard({ icon: Icon, label, value, trend, color = "blue" }: any) {
-  const colors = {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  trend,
+  color = "blue",
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  trend?: string;
+  color?: StatColor;
+}) {
+  const colors: Record<StatColor, string> = {
     blue: "text-blue-400 bg-blue-500/10 border-blue-500/20",
     indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
     emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
@@ -56,7 +71,7 @@ function StatCard({ icon: Icon, label, value, trend, color = "blue" }: any) {
   return (
     <Card className="flex-1">
       <div className="flex items-start justify-between mb-4">
-        <div className={cn("p-2 rounded-xl border", colors[color as keyof typeof colors])}>
+        <div className={cn("p-2 rounded-xl border", colors[color])}>
           <Icon className="w-5 h-5" />
         </div>
         {trend && (
@@ -130,13 +145,14 @@ export default function DatasetsPage() {
                   Data Command Center
                 </h1>
                 <p className="text-zinc-500 text-sm font-medium mt-1">
-                  Orchestrate and analyze your enterprise data ecosystem.
+                  Review uploaded analyses or open the prepared portfolio demo.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 w-full xl:w-auto">
               <ViewToggle value={viewMode} onChange={setViewMode} />
+              <DemoDatasetButton compact label="Run demo" className="hidden sm:inline-flex" />
               <button
                 onClick={() => router.push("/")}
                 className="group flex items-center gap-2 px-6 py-2.5 bg-white text-black text-sm font-bold rounded-xl hover:bg-zinc-200 active:scale-95 transition-all shadow-xl shadow-white/5 ml-auto xl:ml-0"
@@ -149,9 +165,9 @@ export default function DatasetsPage() {
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
-            <StatCard icon={Database} label="Connected Sources" value="12" trend="+2 New" color="blue" />
-            <StatCard icon={BarChart3} label="Neural Extractions" value="482" trend="98% Acc" color="indigo" />
-            <StatCard icon={Sparkles} label="Strategic Insights" value="1.2k" trend="High Signal" color="emerald" />
+            <StatCard icon={Database} label="Supported Formats" value="4" trend="CSV XLSX JSON" color="blue" />
+            <StatCard icon={BarChart3} label="Dashboard Modules" value="8" trend="BI Layer" color="indigo" />
+            <StatCard icon={Sparkles} label="Portfolio Path" value="Live" trend="No Signup" color="emerald" />
           </div>
 
           <div className="relative group rounded-[2.5rem] p-[1px] bg-gradient-to-b from-white/[0.08] to-transparent shadow-2xl overflow-hidden"> 

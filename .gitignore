@@ -33,6 +33,8 @@ Thumbs.db
 # Uploads (temporary files)
 backend/uploads/
 !backend/uploads/.gitkeep
+backend/storage/analyses.json
+*.log
 
 *.zip
 *.exe
